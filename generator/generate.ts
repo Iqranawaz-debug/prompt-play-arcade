@@ -1,6 +1,6 @@
 import { GameSpecSchema, formatIssues, type GameSpec } from '../spec/schema';
 import { SYSTEM_PROMPT, remixPrompt, retryPrompt, userPrompt } from './prompt';
-import { ProviderError, isTransientStatus, type ChatMessage, type ChatProvider } from './providers';
+import { ProviderError, isQuotaError, isTransientStatus, type ChatMessage, type ChatProvider } from './providers';
 import type { GameOptions } from '../spec/gameOptions';
 
 export const MAX_RETRIES = 2;
@@ -88,7 +88,7 @@ export async function completeWithBackoff(
     try {
       return await provider.complete(messages, signal);
     } catch (err) {
-      const transient = err instanceof ProviderError && isTransientStatus(err.status);
+      const transient = err instanceof ProviderError && isTransientStatus(err.status) && !isQuotaError(err);
       if (signal?.aborted || !transient || wait >= busyDelaysMs.length) throw err;
       const delayMs = busyDelaysMs[wait];
       console.warn(`[generate] model busy (HTTP ${err.status}), retrying in ${delayMs}ms`);

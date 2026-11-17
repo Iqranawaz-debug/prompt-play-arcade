@@ -6,7 +6,7 @@ import { GameSpecSchema, SpriteSchema, formatIssues } from '../spec/schema';
 import { GameOptionsSchema } from '../spec/gameOptions';
 import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
-import { ProviderError, isTransientStatus, type ChatProvider } from '../generator/providers';
+import { ProviderError, isQuotaError, isTransientStatus, type ChatProvider } from '../generator/providers';
 import { AskError } from '../generator/ask';
 import { debugGame, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
@@ -136,6 +136,18 @@ app.post('/api/generate', async (req, res) => {
 /** Turn a failure into a title and message a person can act on. */
 function describeFailure(err: unknown, model: string): { title: string; message: string } {
   if (err instanceof ProviderError) {
+    if (isQuotaError(err)) {
+      return {
+        title: `${model} quota used up`,
+        message:
+          'Your API key has reached its usage quota (HTTP 429), so the model refuses new requests until it resets ' +
+          '(free-tier keys usually reset daily). Check your limits with the provider, wait for the reset, or set ' +
+          'FALLBACK_API_KEY in .env to switch to another provider automatically. Saved games still play.' +
+          (err.detail ? `
+
+Provider said: ${err.detail}` : ''),
+      };
+    }
     if (isTransientStatus(err.status)) {
       return {
         title: `${model} is busy right now`,

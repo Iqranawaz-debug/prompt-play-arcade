@@ -167,3 +167,18 @@ describe('enhanceIdea', () => {
     expect(calls[0][1].content).toContain('fishing game');
   });
 });
+
+describe('quota errors', () => {
+  it('does not wait-and-retry a used-up quota (it will not clear in seconds)', async () => {
+    let calls = 0;
+    const provider: ChatProvider = {
+      name: 'q', label: 'Q',
+      complete: async () => {
+        calls++;
+        throw new ProviderError('quota', 429, 'You exceeded your current quota, please check your plan and billing details.');
+      },
+    };
+    await expect(generateSpec(provider, 'x', { busyDelaysMs: [0, 0] })).rejects.toBeInstanceOf(ProviderError);
+    expect(calls).toBe(1);
+  });
+});

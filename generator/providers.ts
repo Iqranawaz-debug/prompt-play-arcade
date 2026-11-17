@@ -51,6 +51,10 @@ export function modelLabel(model: string): string {
 /** HTTP statuses that mean "try again shortly" rather than "this request is wrong". */
 export const isTransientStatus = (status?: number): boolean => status === 429 || (status !== undefined && status >= 500);
 
+/** A used-up quota (daily/billing limit) also arrives as 429, but waiting a few seconds will not fix it. */
+export const isQuotaError = (err: unknown): boolean =>
+  err instanceof ProviderError && err.status === 429 && /quota|billing|exceeded your current/i.test(err.detail ?? err.message);
+
 /** Pull the human-readable message out of a provider error body (Gemini and OpenAI-style JSON). */
 export function errorDetail(body: string): string {
   try {
