@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { GameSpecSchema, LevelSchema, PlayerSchema, SpriteSchema, levelsOf, type GameSpec } from './schema';
+import { RuleSchema } from './rules';
 
 /** Contracts for the AI studio tools. Shared by the server (validation) and the UI (types). */
 
@@ -106,6 +107,21 @@ export function levelsResultSchema(spec: GameSpec, count: number) {
     for (const i of result.error.issues) {
       if (i.path[0] !== 'levels' || typeof i.path[1] !== 'number' || i.path[1] < existing.length) continue;
       ctx.addIssue({ code: 'custom', path: ['levels', i.path[1] - existing.length, ...i.path.slice(2)], message: i.message });
+    }
+  });
+}
+
+// ---------- Rule writing ----------
+/** New rules for `spec`, validated in context: appended to its rules, the whole game must still pass the schema. */
+export function rulesResultSchema(spec: GameSpec) {
+  const existing = spec.rules ?? [];
+  return z.object({ rules: z.array(RuleSchema).min(1).max(5) }).superRefine((r, ctx) => {
+    if (existing.length + r.rules.length > 20) ctx.addIssue({ code: 'custom', path: ['rules'], message: `at most ${20 - existing.length} more rule(s) fit` });
+    const result = GameSpecSchema.safeParse({ ...spec, rules: [...existing, ...r.rules] });
+    if (result.success) return;
+    for (const i of result.error.issues) {
+      if (i.path[0] !== 'rules' || typeof i.path[1] !== 'number' || i.path[1] < existing.length) continue;
+      ctx.addIssue({ code: 'custom', path: ['rules', i.path[1] - existing.length, ...i.path.slice(2)], message: i.message });
     }
   });
 }

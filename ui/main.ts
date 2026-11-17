@@ -20,6 +20,7 @@ import { createAnimationStudio } from './studio/animation';
 import { createLevelEditor } from './studio/levelEditor';
 import { aiLevelPanel } from './studio/levelDesigner';
 import { createLogicBuilder } from './studio/logic';
+import { aiRulePanel } from './studio/ruleWriter';
 import { createSavesDialog } from './savesDialog';
 import type { SaveState } from '../spec/saveState';
 import { createAssetStudio } from './studio/assets';
@@ -709,7 +710,7 @@ const assetTool = createAssetStudio($('overlays'), studio);
 const physicsTool = createPhysicsSettings($('overlays'), studio);
 const animationTool = createAnimationStudio($('overlays'), studio);
 const levelTool = createLevelEditor($('overlays'), studio, aiLevelPanel);
-const logicTool = createLogicBuilder($('overlays'), studio);
+const logicTool = createLogicBuilder($('overlays'), studio, aiRulePanel);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */

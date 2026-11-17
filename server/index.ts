@@ -8,7 +8,7 @@ import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isQuotaError, isTransientStatus, type ChatProvider } from '../generator/providers';
 import { AskError } from '../generator/ask';
-import { animateSprite, debugGame, designLevels, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
+import { animateSprite, debugGame, designLevels, writeRules, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -100,6 +100,11 @@ toolRoute(
   z.object({ spec: GameSpecSchema, request: z.string().trim().min(3).max(600), count: z.number().int().min(1).max(4) }),
   async (b, p, signal) => ({ levels: await designLevels(p, b.spec, b.request, b.count, signal) }),
 );
+
+/** New logic rules for a game (Logic Builder), validated against the game. */
+toolRoute('/api/rules', z.object({ spec: GameSpecSchema, request: z.string().trim().min(3).max(600) }), async (b, p, signal) => ({
+  rules: await writeRules(p, b.spec, b.request, signal),
+}));
 
 app.post('/api/generate', async (req, res) => {
   if (!provider) {

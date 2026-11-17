@@ -1,5 +1,6 @@
 import type { GenerateEvent, GenerateProgress } from '../generator/generate';
 import { GameSpecSchema, LevelSchema, type GameSpec } from '../spec/schema';
+import { RuleSchema } from '../spec/rules';
 import type { GameOptions } from '../spec/gameOptions';
 import { z } from 'zod';
 import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
@@ -127,3 +128,6 @@ export const fetchFrames = (sprite: GameSpec['sprites'][string], motion: string,
 
 export const fetchLevels = (spec: GameSpec, request: string, count: number, signal?: AbortSignal) =>
   postTool('/api/levels', { spec, request, count }, z.object({ levels: z.array(LevelSchema.extend({ name: z.string() })) }), 'Could not design levels', signal).then((r) => r.levels);
+
+export const fetchRules = (spec: GameSpec, request: string, signal?: AbortSignal) =>
+  postTool('/api/rules', { spec, request }, z.object({ rules: z.array(RuleSchema) }), 'Could not write rules', signal).then((r) => r.rules);

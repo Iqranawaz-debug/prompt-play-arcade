@@ -159,3 +159,16 @@ describe('designLevels', () => {
     expect(calls[0][0].content).toContain('PLATFORMER');
   });
 });
+
+describe('writeRules', () => {
+  it('sends unknown-entity problems back and returns valid rules', async () => {
+    const { writeRules } = await import('./tools');
+    const bad = { name: 'Boss', when: { on: 'time', seconds: 20 }, then: [{ do: 'spawn', entity: 'dragon' }] };
+    const good = { name: 'Boss', when: { on: 'time', seconds: 20 }, then: [{ do: 'spawn', entity: 'comet', count: 3 }] };
+    const { provider, calls } = fake([JSON.stringify({ rules: [bad] }), JSON.stringify({ rules: [good] })]);
+    const rules = await writeRules(provider, comet, 'a boss wave after 20 seconds');
+    expect(rules[0].then[0]).toEqual({ do: 'spawn', entity: 'comet', count: 3 });
+    expect(calls[1].at(-1)!.content).toContain('unknown entity "dragon"');
+    expect(calls[0][0].content).toContain('"comet" (');
+  });
+});

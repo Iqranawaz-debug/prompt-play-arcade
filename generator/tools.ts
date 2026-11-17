@@ -3,7 +3,9 @@ import { DEFAULT_TILE, maxCols, maxRows, parseLevel } from '../spec/level';
 import { jumpReach } from '../spec/reach';
 import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { lintSpec } from '../spec/lint';
-import { CharacterSchema, DebugResultSchema, FramesResultSchema, levelsResultSchema, type DesignedLevel, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
+import { z } from 'zod';
+import { RuleSchema, type Rule } from '../spec/rules';
+import { CharacterSchema, DebugResultSchema, FramesResultSchema, levelsResultSchema, rulesResultSchema, type DesignedLevel, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 import { askJson } from './ask';
 import { SPRITE_RULES, jsonSchema } from './prompt';
 import type { ChatProvider } from './providers';
@@ -148,4 +150,21 @@ Reply with JSON only: {"levels":[{"name","tileSize","map"}]} with exactly ${coun
       `Request:\n"""${request}"""`,
   });
   return result.levels.slice(0, count);
+}
+
+// ---------- Rule writing (Logic Builder) ----------
+export async function writeRules(provider: ChatProvider, spec: GameSpec, request: string, signal?: AbortSignal): Promise<Rule[]> {
+  const result = await askJson(provider, {
+    schema: rulesResultSchema(spec),
+    signal,
+    system: `You add game logic rules to an existing 2D game. ${ENGINE_FACTS}
+A rule is {"name", "when", "if": [conditions], "then": [actions]} and the engine runs it while the game plays.
+JSON Schema of one rule:
+${JSON.stringify(z.toJSONSchema(RuleSchema, { io: 'input' }))}
+Use only these entity ids: ${spec.entities.map((e) => `"${e.id}" (${e.name})`).join(', ')}.
+Prefer 1-3 small rules that do exactly what the player asked. Keep messages short and fun.
+Reply with JSON only: {"rules":[...]}`,
+    user: `The game:\n${JSON.stringify({ title: spec.title, win: spec.win, lose: spec.lose, player: { lives: spec.player.lives, speed: spec.player.speed }, entities: spec.entities.map((e) => ({ id: e.id, name: e.name, behavior: e.behavior, onCollide: e.onCollide })), rules: spec.rules ?? [] })}\n\nRequest:\n"""${request}"""`,
+  });
+  return result.rules;
 }
