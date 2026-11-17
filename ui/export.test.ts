@@ -17,3 +17,14 @@ describe('describeProgress', () => {
     expect(retry).toEqual({ phase: 'Retrying 1/2…', detail: 'Fixing 3 problems' });
   });
 });
+
+describe('timeAgo', () => {
+  it('formats recent times compactly', async () => {
+    const { timeAgo } = await import('./library');
+    const now = Date.UTC(2026, 10, 17, 12);
+    expect(timeAgo(now - 20_000, now)).toBe('just now');
+    expect(timeAgo(now - 5 * 60_000, now)).toBe('5m ago');
+    expect(timeAgo(now - 3 * 3_600_000, now)).toBe('3h ago');
+    expect(timeAgo(now - 2 * 86_400_000, now)).toBe('2d ago');
+  });
+});

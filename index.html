@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0d13" />
     <title>Game Generator</title>
     <link
       rel="icon"
@@ -11,27 +12,53 @@
   </head>
   <body>
     <header class="topbar">
-      <h1>Game Generator</h1>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 11h4M8 9v4" /><path d="M15 12h.01M18 10h.01" />
+            <path d="M17.3 5H6.7a4 4 0 0 0-3.96 3.43l-.9 6.3A2.6 2.6 0 0 0 6.2 16.8L8.5 14.5h7l2.3 2.3a2.6 2.6 0 0 0 4.36-2.07l-.9-6.3A4 4 0 0 0 17.3 5z" />
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Game Generator</h1>
+          <span class="brand-tagline">Describe it. Play it.</span>
+        </div>
+      </div>
       <span id="model-chip" class="pill">Checking server…</span>
     </header>
+
     <main class="layout">
-      <aside class="sidebar">
+      <aside class="sidebar" aria-label="Create and library">
         <form id="gen-form" class="composer">
           <div id="remix-banner" class="remix-banner" hidden>
             <span id="remix-label"></span>
-            <button id="remix-cancel" type="button">Stop remixing</button>
+            <button id="remix-cancel" type="button" class="ghost">Stop remixing</button>
           </div>
-          <label id="prompt-label" for="prompt">Describe a game</label>
-          <textarea
-            id="prompt"
-            rows="3"
-            maxlength="2000"
-            placeholder="A cozy fishing game where the fish are tiny philosophers"
-          ></textarea>
-          <div class="row">
-            <button id="generate" type="submit" class="primary">Generate</button>
-            <span id="gen-note" class="note" role="status" aria-live="polite"></span>
+
+          <div class="field-label">
+            <label id="prompt-label" for="prompt">Describe a game</label>
           </div>
+          <div class="prompt-field">
+            <textarea
+              id="prompt"
+              rows="3"
+              maxlength="2000"
+              placeholder="A cozy fishing game where the fish are tiny philosophers"
+            ></textarea>
+            <div class="field-footer">
+              <span id="prompt-counter" class="counter">0 / 2000</span>
+              <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to generate</span>
+            </div>
+          </div>
+
+          <button id="generate" type="submit" class="primary btn-lg">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+              <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+            </svg>
+            <span class="btn-label">Generate</span>
+          </button>
+          <p id="gen-note" class="note" role="status" aria-live="polite"></p>
 
           <div id="gen-status-box" class="status-box" hidden role="status" aria-live="polite">
             <span class="spinner" aria-hidden="true"></span>
@@ -47,27 +74,86 @@
               <strong id="gen-error-title">Generation failed</strong>
               <p id="gen-error-text"></p>
             </div>
-            <button id="gen-error-close" type="button" class="icon" aria-label="Dismiss error">×</button>
+            <button id="gen-error-close" type="button" class="close" aria-label="Dismiss error">×</button>
           </div>
         </form>
 
-        <h2 class="section-title">Library</h2>
+        <div class="library-head">
+          <h2 class="section-title">Library</h2>
+          <span id="library-count" class="library-count"></span>
+        </div>
         <ul id="library" class="library"></ul>
       </aside>
 
       <section class="stage" aria-labelledby="stage-title">
         <div class="stage-bar">
-          <h2 id="stage-title">No game selected</h2>
+          <div class="stage-heading">
+            <h2 id="stage-title">No game selected</h2>
+            <span id="stage-sub" class="stage-sub">Preview</span>
+          </div>
           <div class="stage-actions">
-            <button id="restart" type="button" disabled>Restart</button>
-            <button id="fullscreen" type="button" disabled>Fullscreen</button>
+            <button id="restart" type="button" class="btn-md" disabled>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
+              </svg>
+              <span class="btn-label">Restart</span>
+            </button>
+            <button id="fullscreen" type="button" class="btn-md" disabled>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+              </svg>
+              <span class="btn-label">Fullscreen</span>
+            </button>
           </div>
         </div>
+
         <div class="stage-fit">
-          <div id="stage-frame" class="frame">
-            <p class="placeholder">Pick a game from the library, or generate a new one.</p>
+          <div id="frame-wrap" class="frame-wrap">
+            <div id="stage-frame" class="frame"></div>
+
+            <div id="stage-empty" class="empty-state">
+              <div class="empty-inner">
+                <svg class="empty-art" viewBox="0 0 220 150" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="eg-body" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stop-color="#2b3452" />
+                      <stop offset="1" stop-color="#161c2c" />
+                    </linearGradient>
+                    <linearGradient id="eg-edge" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stop-color="#ffb454" />
+                      <stop offset="1" stop-color="#8f80f5" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M62 50h96c22 0 36 18 40 44l4 22c3 16-12 26-24 16l-22-20H64l-22 20c-12 10-27 0-24-16l4-22c4-26 18-44 40-44z"
+                    fill="url(#eg-body)" stroke="url(#eg-edge)" stroke-width="2.5"
+                  />
+                  <path d="M64 78v24M52 90h24" stroke="#ffb454" stroke-width="7" stroke-linecap="round" />
+                  <circle cx="150" cy="82" r="6.5" fill="#8f80f5" />
+                  <circle cx="166" cy="96" r="6.5" fill="#ffb454" />
+                  <circle cx="134" cy="96" r="6.5" fill="#5b8def" />
+                  <circle cx="150" cy="110" r="6.5" fill="#e9edf4" opacity="0.8" />
+                  <path d="M40 16q1.5 6.5 8 8q-6.5 1.5-8 8q-1.5-6.5-8-8q6.5-1.5 8-8z" fill="#ffb454" />
+                  <path d="M182 22q1.2 5 6 6q-4.8 1.2-6 6q-1.2-4.8-6-6q4.8-1 6-6z" fill="#8f80f5" />
+                  <path d="M112 6q1 4 5 5q-4 1-5 5q-1-4-5-5q4-1 5-5z" fill="#e9edf4" opacity="0.7" />
+                </svg>
+                <h3>Your next game starts with a sentence</h3>
+                <p>Describe a game in the prompt box and it will be designed for you, or pick one from your library.</p>
+                <div id="idea-chips" class="idea-chips" aria-label="Try an idea">
+                  <button type="button" data-idea="A penguin chef catching falling fish while dodging snowballs">Penguin chef</button>
+                  <button type="button" data-idea="A neon bee dodging raindrops in a rainy city at night">Neon bee</button>
+                  <button type="button" data-idea="A tiny wizard collecting stars while sleepy bats give chase">Tiny wizard</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <p class="stage-hint" aria-hidden="true">
+          <span><kbd>←</kbd> <kbd>→</kbd> or drag to move</span>
+          <span><kbd>Space</kbd> to start</span>
+          <span><kbd>M</kbd> sound</span>
+        </p>
         <p id="stage-error" class="alert compact" role="alert" hidden></p>
       </section>
     </main>

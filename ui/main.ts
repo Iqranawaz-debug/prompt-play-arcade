@@ -1,7 +1,11 @@
-import './style.css';
+import './styles/tokens.css';
+import './styles/layout.css';
+import './styles/components.css';
+import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './db';
 import { exportGame } from './export';
+import { setButtonLabel } from './icons';
 import { renderLibrary } from './library';
 import { GamePlayer } from './player';
 import { StatusBox, describeProgress } from './status';
@@ -24,6 +28,12 @@ const stageTitle = $('stage-title');
 const stageError = $('stage-error');
 const restartBtn = $<HTMLButtonElement>('restart');
 const fullscreenBtn = $<HTMLButtonElement>('fullscreen');
+const promptCounter = $('prompt-counter');
+const libraryCount = $('library-count');
+const stageSub = $('stage-sub');
+const stageEmpty = $('stage-empty');
+const frameWrap = $('frame-wrap');
+const ideaChips = [...document.querySelectorAll<HTMLButtonElement>('#idea-chips button')];
 
 const status = new StatusBox($('gen-status-box'), $('gen-phase'), $('gen-detail'));
 const DEFAULT_PLACEHOLDER = promptBox.placeholder;
@@ -50,19 +60,38 @@ const player = new GamePlayer($('stage-frame'), {
   onError: (message) => showStageError(message),
 });
 
+/** Keep the preview chrome in step with the player: buttons, empty state, glow and heading. */
 function syncStageButtons(): void {
   restartBtn.disabled = !player.loaded;
   fullscreenBtn.disabled = !player.loaded || !document.fullscreenEnabled;
-  fullscreenBtn.textContent = player.isFullscreen ? 'Exit fullscreen' : 'Fullscreen';
+  setButtonLabel(fullscreenBtn, player.isFullscreen ? 'Exit fullscreen' : 'Fullscreen');
+  stageEmpty.hidden = player.loaded;
+}
+
+/** Tint the preview's heading and ambient glow with the game's own theme (or the app accents when empty). */
+function setStageInfo(game?: { title: string; spec: GameSpec }): void {
+  stageTitle.textContent = game?.title ?? 'No game selected';
+  stageSub.textContent = game?.spec.description || 'Preview';
+  stageSub.title = game?.spec.description ?? '';
+  frameWrap.style.setProperty('--glow-a', game?.spec.theme.primary ?? 'var(--accent)');
+  frameWrap.style.setProperty('--glow-b', game?.spec.theme.accent ?? 'var(--violet)');
+}
+
+function updateCounter(): void {
+  const n = promptBox.value.length;
+  promptCounter.textContent = `${n} / ${promptBox.maxLength}`;
+  promptCounter.classList.toggle('near-limit', n > promptBox.maxLength * 0.9);
 }
 
 async function refreshLibrary(): Promise<void> {
-  renderLibrary(libraryList, await listGames(), activeId, { play, remix, exportHtml, remove });
+  const games = await listGames();
+  libraryCount.textContent = games.length === 1 ? '1 game' : `${games.length} games`;
+  renderLibrary(libraryList, games, activeId, { play, remix, exportHtml, remove });
 }
 
 async function play(game: SavedGame): Promise<void> {
   activeId = game.id;
-  stageTitle.textContent = game.title;
+  setStageInfo(game);
   showStageError();
   await refreshLibrary();
   libraryList.querySelector('.game.active')?.scrollIntoView({ block: 'nearest' });
@@ -85,12 +114,14 @@ function setRemixTarget(game: SavedGame | undefined): void {
   remixLabel.textContent = game ? `Remixing "${game.title}"` : '';
   promptLabel.textContent = game ? 'What should change?' : 'Describe a game';
   promptBox.placeholder = game ? 'e.g. make it night time and add a shark that chases you' : DEFAULT_PLACEHOLDER;
-  generateBtn.textContent = buttonLabel(false);
+  form.classList.toggle('remixing', Boolean(game));
+  setButtonLabel(generateBtn, buttonLabel(false));
 }
 
 function remix(game: SavedGame): void {
   setRemixTarget(game);
   promptBox.value = '';
+  updateCounter();
   promptBox.focus();
 }
 
@@ -108,7 +139,7 @@ async function remove(game: SavedGame): Promise<void> {
   if (activeId === game.id) {
     activeId = undefined;
     player.stop();
-    stageTitle.textContent = 'No game selected';
+    setStageInfo();
     syncStageButtons();
   }
   await refreshLibrary();
@@ -118,7 +149,8 @@ function setBusy(busy: boolean): void {
   generateBtn.disabled = busy;
   promptBox.disabled = busy;
   remixBanner.querySelector('button')!.disabled = busy;
-  generateBtn.textContent = buttonLabel(busy);
+  for (const chip of ideaChips) chip.disabled = busy;
+  setButtonLabel(generateBtn, buttonLabel(busy));
 }
 
 form.addEventListener('submit', async (e) => {
@@ -149,6 +181,7 @@ form.addEventListener('submit', async (e) => {
       : await addGame(prompt, spec);
     genNote.textContent = `Created "${spec.title}"${attempts > 1 ? ` after ${attempts} attempts` : ''}.`;
     promptBox.value = '';
+    updateCounter();
     setRemixTarget(undefined);
     await play(game);
   } catch (err) {
@@ -178,9 +211,22 @@ document.addEventListener('fullscreenchange', syncStageButtons);
 promptBox.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit();
 });
+promptBox.addEventListener('input', updateCounter);
+
+// "Try an idea" chips in the empty state fill the prompt box with a new-game idea.
+for (const chip of ideaChips) {
+  chip.addEventListener('click', () => {
+    setRemixTarget(undefined);
+    promptBox.value = chip.dataset.idea ?? '';
+    updateCounter();
+    promptBox.focus();
+  });
+}
 
 async function init(): Promise<void> {
   syncStageButtons();
+  setStageInfo();
+  updateCounter();
   await seedIfEmpty();
   await refreshLibrary();
   const health = await fetchHealth();
@@ -192,7 +238,8 @@ async function init(): Promise<void> {
       ? `Provider: ${health.provider}`
       : 'Add LLM_API_KEY to .env to generate games.';
   modelChip.classList.toggle('ok', Boolean(health?.label));
-  modelChip.classList.toggle('warn', !health?.label);
+  modelChip.classList.toggle('warn', Boolean(health) && !health?.label);
+  modelChip.classList.toggle('offline', !health);
 }
 
 init().catch((err) => showGenError('Could not start', (err as Error).message));

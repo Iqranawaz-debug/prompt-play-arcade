@@ -1,0 +1,89 @@
+/* Design tokens: the single source for colour, shape, type, spacing, elevation and motion. */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: charcoal base, deep navy panels */
+  --bg-0: #0a0d13;
+  --bg-1: #0e1420;
+  --surface-1: #141a26;
+  --surface-2: #1a2131;
+  --surface-sunken: #0b1019;
+  --glass: rgb(19 26 41 / 0.62);
+  --glass-header: rgb(10 13 19 / 0.55);
+  --border: rgb(255 255 255 / 0.07);
+  --border-strong: rgb(255 255 255 / 0.14);
+
+  /* Text */
+  --text: #e9edf4;
+  --text-2: #a4aec0;
+  --text-3: #6f7a8f;
+
+  /* Accents: warm orange primary, muted violet/blue secondary */
+  --accent: #ffb454;
+  --accent-2: #ff8a3d;
+  --accent-ink: #251605;
+  --accent-soft: rgb(255 180 84 / 0.14);
+  --violet: #8f80f5;
+  --violet-2: #6d7cf0;
+  --violet-soft: rgb(143 128 245 / 0.14);
+  --blue: #5b8def;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-soft: rgb(248 113 113 / 0.12);
+
+  /* Shape */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* Spacing (4px grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* Type */
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+
+  /* Controls */
+  --h-sm: 32px;
+  --h-md: 36px;
+  --h-lg: 44px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5);
+  --highlight: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --ring: 0 0 0 3px rgb(255 180 84 / 0.35);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 150ms;
+  --t: 200ms;
+
+  --header-h: 60px;
+  --gap: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  /* A spinner that does not spin reads as broken, so keep it, slowly. */
+  .spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+}
