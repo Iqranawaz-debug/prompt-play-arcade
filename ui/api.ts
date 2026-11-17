@@ -86,3 +86,22 @@ export async function generateGame(
   }
   throw new Error('The server closed the connection before the game was ready.');
 }
+
+/** Ask the model to turn a short idea into a richer description. */
+export async function enhancePrompt(prompt: string, options?: GameOptions, signal?: AbortSignal): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch('/api/enhance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, options }),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    throw new Error('Could not reach the local server. Is "npm run dev" running?');
+  }
+  const data = (await res.json().catch(() => ({}))) as { prompt?: string; error?: string; title?: string };
+  if (!res.ok || typeof data.prompt !== 'string') throw new GenerateFailure(data.title ?? 'Could not enhance the prompt', data.error ?? `Server error ${res.status}`);
+  return data.prompt;
+}

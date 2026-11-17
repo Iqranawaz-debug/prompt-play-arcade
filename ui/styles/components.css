@@ -385,3 +385,20 @@ button.options-toggle:hover:not(:disabled) { background: rgb(255 255 255 / 0.04)
 .option-chips button[aria-checked='true'] { color: var(--accent-ink); border-color: transparent; background: linear-gradient(180deg, var(--accent-hi), var(--accent)); }
 .option-pair .segmented button { height: 26px; font-size: 11px; padding: 0 4px; }
 .composer.remixing .game-options { display: none; }
+
+/* ---------- Prompt enhancer ---------- */
+button.enhance-btn {
+  height: 26px; padding: 0 10px; gap: 5px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 650;
+  color: var(--accent); border-color: rgb(var(--accent-rgb) / 0.35);
+  background: linear-gradient(135deg, rgb(var(--accent-rgb) / 0.14), rgb(var(--violet-rgb) / 0.12));
+}
+button.enhance-btn .icon { width: 13px; height: 13px; }
+button.enhance-btn:hover:not(:disabled) { color: var(--accent-hi); border-color: rgb(var(--accent-rgb) / 0.6); box-shadow: 0 0 14px rgb(var(--accent-rgb) / 0.25); }
+button.enhance-btn.working .icon { animation: spin 1s linear infinite; }
+.composer.remixing .enhance-btn { display: none; }
+.enhance-note {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-top: var(--s-2);
+  padding: 4px 4px 4px var(--s-3); border-radius: var(--r-sm); font-size: var(--fs-xs); color: var(--text-2);
+  background: rgb(var(--accent-rgb) / 0.08); border: 1px solid rgb(var(--accent-rgb) / 0.25); animation: rise var(--t) var(--ease);
+}
+.enhance-note button { height: 24px; font-size: var(--fs-xs); }

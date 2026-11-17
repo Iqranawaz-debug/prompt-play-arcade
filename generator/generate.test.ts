@@ -156,3 +156,14 @@ describe('game options in the prompt', () => {
     expect(msg).toContain('"sfx" to "none"');
   });
 });
+
+describe('enhanceIdea', () => {
+  it('returns the richer description and retries once on a malformed reply', async () => {
+    const { enhanceIdea } = await import('./enhance');
+    const better = 'You are a tiny boat drifting down a stream, catching glowing fish while dodging rocks. Catch 20 fish before sunset.';
+    const { provider, calls } = fakeProvider(['not json', JSON.stringify({ prompt: better })]);
+    expect(await enhanceIdea(provider, 'fishing game')).toBe(better);
+    expect(calls).toHaveLength(2);
+    expect(calls[0][1].content).toContain('fishing game');
+  });
+});

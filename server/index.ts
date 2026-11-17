@@ -7,6 +7,7 @@ import { GameOptionsSchema } from '../spec/gameOptions';
 import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isTransientStatus } from '../generator/providers';
+import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -24,6 +25,34 @@ const GenerateBody = z.object({
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, provider: provider?.name ?? null, label: provider?.label ?? null });
+});
+
+const EnhanceBody = z.object({ prompt: z.string().trim().min(3).max(2000), options: GameOptionsSchema.optional() });
+
+/** Rewrite a short idea into a richer game description. */
+app.post('/api/enhance', async (req, res) => {
+  if (!provider) {
+    res.status(503).json({ error: 'No LLM provider configured. Copy .env.example to .env and set LLM_API_KEY.' });
+    return;
+  }
+  const body = EnhanceBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: 'Send { "prompt": "..." } with 3-2000 characters.' });
+    return;
+  }
+  const cancel = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) cancel.abort(new Error('cancelled by client'));
+  });
+  try {
+    const prompt = await enhanceIdea(provider, body.data.prompt, body.data.options, cancel.signal);
+    res.json({ prompt });
+  } catch (err) {
+    if (cancel.signal.aborted) return;
+    const failure = describeFailure(err, provider.label);
+    console.error('[enhance] failed:', (err as Error).message);
+    res.status(err instanceof ProviderError ? 502 : 500).json({ error: failure.message, title: failure.title });
+  }
 });
 
 app.post('/api/generate', async (req, res) => {

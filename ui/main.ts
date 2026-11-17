@@ -3,7 +3,7 @@ import './styles/layout.css';
 import './styles/components.css';
 import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
-import { GenerateFailure, fetchHealth, generateGame } from './api';
+import { GenerateFailure, enhancePrompt, fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, markPlayed, seedIfEmpty, setFavorite, type SavedGame } from './db';
 import { createGameOptions } from './gameOptions';
 import { GENRES } from './genre';
@@ -129,11 +129,59 @@ function setStageInfo(game?: { title: string; spec: GameSpec }): void {
   frameWrap.style.setProperty('--glow-b', game?.spec.theme.accent ?? 'var(--violet)');
 }
 
+// ---------- AI prompt enhancer ----------
+const enhanceBtn = $<HTMLButtonElement>('enhance');
+const enhanceNote = $('enhance-note');
+let beforeEnhance: string | undefined;
+let enhancing: AbortController | undefined;
+
+async function enhance(): Promise<void> {
+  const idea = promptBox.value.trim();
+  if (idea.length < 3 || enhancing || inFlight) return;
+  const controller = new AbortController();
+  enhancing = controller;
+  showGenError();
+  enhanceNote.hidden = true;
+  enhanceBtn.classList.add('working');
+  setButtonLabel(enhanceBtn, 'Enhancing…');
+  promptBox.disabled = true;
+  updateCounter();
+  try {
+    const better = await enhancePrompt(idea, gameOptions.get(), controller.signal);
+    beforeEnhance = promptBox.value;
+    promptBox.value = better;
+    enhanceNote.hidden = false;
+    notify('success', 'Prompt enhanced', 'Review it, tweak anything, then Generate.');
+  } catch (err) {
+    if (!controller.signal.aborted) {
+      const title = err instanceof GenerateFailure ? err.title : 'Could not enhance the prompt';
+      showGenError(title, (err as Error).message);
+    }
+  } finally {
+    enhancing = undefined;
+    enhanceBtn.classList.remove('working');
+    setButtonLabel(enhanceBtn, 'Enhance');
+    promptBox.disabled = Boolean(inFlight);
+    updateCounter();
+    promptBox.focus();
+  }
+}
+
+enhanceBtn.addEventListener('click', () => void enhance());
+$('enhance-undo').addEventListener('click', () => {
+  if (beforeEnhance !== undefined) promptBox.value = beforeEnhance;
+  beforeEnhance = undefined;
+  enhanceNote.hidden = true;
+  updateCounter();
+  promptBox.focus();
+});
+
 function updateCounter(): void {
   const n = promptBox.value.length;
   promptCounter.textContent = `${n} / ${promptBox.maxLength}`;
   promptCounter.classList.toggle('near-limit', n > promptBox.maxLength * 0.9);
   form.classList.toggle('has-prompt', promptBox.value.trim().length >= 3);
+  enhanceBtn.disabled = promptBox.value.trim().length < 3 || Boolean(enhancing) || Boolean(inFlight);
 }
 
 /** Latest library contents (unfiltered), also used by the command palette. */
@@ -298,6 +346,8 @@ function setBusy(busy: boolean): void {
   remixBanner.querySelector('button')!.disabled = busy;
   for (const chip of ideaChips) chip.disabled = busy;
   gameOptions.setDisabled(busy);
+  enhanceBtn.disabled = busy || promptBox.value.trim().length < 3;
+  if (busy) enhanceNote.hidden = true;
   setButtonLabel(generateBtn, buttonLabel(busy));
 }
 
@@ -399,6 +449,11 @@ function commands(): Command[] {
       id: 'generate', group: 'Create', title: 'Generate from the current prompt', hint: 'Ctrl+Enter', keywords: 'make build',
       disabled: promptBox.value.trim().length < 3 || Boolean(inFlight),
       run: () => form.requestSubmit(),
+    },
+    {
+      id: 'enhance', group: 'Create', title: 'Enhance prompt with AI', keywords: 'improve expand describe better idea',
+      disabled: promptBox.value.trim().length < 3 || Boolean(inFlight) || Boolean(enhancing) || Boolean(remixTarget),
+      run: () => void enhance(),
     },
     {
       id: 'remix', group: 'Create', title: current ? `Remix "${current.title}"` : 'Remix the current game', keywords: 'change edit modify',
