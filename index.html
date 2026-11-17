@@ -32,6 +32,15 @@
       </div>
       <div class="top-actions">
         <span id="model-chip" class="pill">Checking server…</span>
+        <div class="notif-wrap">
+          <button id="open-notifications" type="button" class="icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" title="Notifications">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2.2 2.2 0 0 0 4 0" />
+            </svg>
+            <span id="notif-count" class="notif-count" hidden>0</span>
+          </button>
+          <div id="notif-panel" class="notif-panel glass" role="region" aria-label="Notifications" hidden></div>
+        </div>
         <button id="open-settings" type="button" class="icon-btn" aria-label="Customize" title="Customize">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" />
@@ -39,7 +48,7 @@
         </button>
       </div>
     </header>
-    <div id="overlays"></div>
+    <div id="overlays"><div id="toasts" class="toasts"></div></div>
 
     <main class="layout">
       <aside class="sidebar" aria-label="Create and library">

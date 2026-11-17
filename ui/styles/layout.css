@@ -157,6 +157,8 @@ h1, h2, h3, p { margin: 0; }
 /* ---------- Ambient background: drifting orbs + starfield canvas (ui/ambient.ts) ---------- */
 .ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .topbar, .layout { position: relative; z-index: 1; }
+/* The header hosts popovers (notifications), so it must stack above the main area. */
+.topbar { z-index: 30; }
 #ambient-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
 .orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.32; will-change: transform; }
 .orb-a { width: 46vmax; height: 46vmax; left: -12vmax; top: -16vmax; background: radial-gradient(circle, rgb(var(--accent-2-rgb) / 0.55), transparent 65%); animation: orb-a 46s ease-in-out infinite alternate; }

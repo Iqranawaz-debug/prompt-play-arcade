@@ -8,6 +8,7 @@ import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './d
 import { exportGame } from './export';
 import { startAmbient } from './ambient';
 import { createSettingsDrawer } from './drawer';
+import { createNotificationCenter, notify } from './notifications';
 import { applySettings, getSettings, onSettings } from './settings';
 import { setButtonLabel } from './icons';
 import { renderLibrary } from './library';
@@ -172,13 +173,16 @@ function remix(game: SavedGame): void {
 async function exportHtml(game: SavedGame): Promise<void> {
   try {
     await exportGame(game.spec);
+    notify('success', 'Export completed', `"${game.title}" saved as a standalone .html file.`);
   } catch (err) {
     showGenError('Export failed', (err as Error).message);
+    notify('error', 'Export failed', (err as Error).message);
   }
 }
 
 async function remove(game: SavedGame): Promise<void> {
   await deleteGame(game.id);
+  notify('info', 'Game deleted', `"${game.title}" was removed from your library.`);
   if (remixTarget?.id === game.id) setRemixTarget(undefined);
   if (activeId === game.id) {
     activeId = undefined;
@@ -224,14 +228,20 @@ form.addEventListener('submit', async (e) => {
       ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, base.id)
       : await addGame(prompt, spec);
     genNote.textContent = `Created "${spec.title}"${attempts > 1 ? ` after ${attempts} attempts` : ''}.`;
+    notify('success', base ? 'Remix ready' : 'Game generated successfully', `"${spec.title}" is ready to play.`);
     promptBox.value = '';
     updateCounter();
     setRemixTarget(undefined);
     await play(game);
   } catch (err) {
-    if (controller.signal.aborted) genNote.textContent = 'Cancelled.';
-    else if (err instanceof GenerateFailure) showGenError(err.title, err.message);
-    else showGenError(base ? 'Remix failed' : 'Generation failed', (err as Error).message);
+    if (controller.signal.aborted) {
+      genNote.textContent = 'Cancelled.';
+      notify('info', 'Generation cancelled');
+    } else {
+      const title = err instanceof GenerateFailure ? err.title : base ? 'Remix failed' : 'Generation failed';
+      showGenError(title, (err as Error).message);
+      notify('error', title, (err as Error).message);
+    }
   } finally {
     inFlight = undefined;
     status.stop();
@@ -268,6 +278,7 @@ for (const chip of ideaChips) {
 }
 
 applySettings();
+createNotificationCenter($<HTMLButtonElement>('open-notifications'), $('notif-count'), $('notif-panel'), $('toasts'));
 const settingsDrawer = createSettingsDrawer($('overlays'));
 $('open-settings').addEventListener('click', () => settingsDrawer.open());
 
