@@ -366,3 +366,15 @@ button.asset-tile span:last-child { font-size: 10.5px; color: var(--text-3); fon
 @media (max-width: 720px) { .asset-layout { grid-template-columns: 1fr; } }
 /* While a dialog is open, toasts move to the top so they never cover its buttons. */
 .modal-open .toasts { top: var(--s-4); bottom: auto; right: 50%; transform: translateX(50%); }
+
+/* Physics Settings */
+.mode-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.physics-row { display: grid; grid-template-columns: 110px 1fr 52px; align-items: center; gap: var(--s-3); font-size: var(--fs-sm); color: var(--text-2); }
+.physics-row input { accent-color: var(--accent); }
+.physics-row input:disabled { opacity: 0.4; }
+.physics-row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.physics-readout { margin: 0; font-size: var(--fs-xs); color: var(--text-3); }
+.physics-readout.ok { color: var(--success, #4ade80); }
+.physics-readout.warn { color: var(--danger, #f87171); }
+.map-preview { width: 100%; max-width: 480px; aspect-ratio: 480 / 248; border-radius: var(--r-md); border: 1px solid var(--border); }
+@media (max-width: 720px) { .mode-grid { grid-template-columns: 1fr 1fr; } }

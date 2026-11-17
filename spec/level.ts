@@ -78,3 +78,21 @@ export function wallRuns(g: Grid): { col: number; row: number; len: number }[] {
 
 /** Peak height of a jump, in pixels, for a launch speed and gravity. */
 export const jumpHeight = (jump: number, gravity: number): number => (gravity > 0 ? (jump * jump) / (2 * gravity) : Infinity);
+
+/** A ready-made ledge layout for 40px tiles, used when turning a game into a platformer. */
+export const STARTER_MAP: readonly string[] = [
+  '',
+  '',
+  '..####............####..',
+  '',
+  '.........######.........',
+  '',
+  '...####..........####...',
+  '',
+  '.........######.........',
+  '',
+  '.P......................',
+  '########################',
+];
+
+export const PLATFORMER_PHYSICS = { gravity: 1400, jump: 680, friction: 0.3 } as const;
