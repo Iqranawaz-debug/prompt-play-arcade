@@ -327,3 +327,20 @@ button.keyslot.empty { color: var(--text-3); font-family: inherit; font-weight: 
 button.keyslot.listening { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); animation: blink 1s ease-in-out infinite; }
 .pad-status { margin: var(--s-2) 0; font-size: var(--fs-xs); color: var(--text-3); }
 .pad-status.on { color: var(--success); }
+
+/* Sound Designer */
+.music-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2); }
+.music-card { position: relative; display: flex; align-items: stretch; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface-1); transition: border-color var(--t) var(--ease), background var(--t) var(--ease); }
+.music-card.on { border-color: rgb(var(--accent-rgb) / 0.7); background: linear-gradient(135deg, rgb(var(--accent-rgb) / 0.12), rgb(var(--accent-rgb) / 0.03)), var(--surface-1); }
+button.music-pick { flex: 1; height: auto; min-height: 58px; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--s-2) var(--s-3); border: 0; background: transparent; text-align: left; white-space: normal; }
+button.music-pick strong { font-size: var(--fs-sm); }
+button.music-pick span { font-size: 11px; color: var(--text-3); font-weight: 500; }
+button.preview { align-self: center; margin-right: var(--s-2); width: 30px; height: 30px; border-radius: 50%; color: var(--accent); border-color: rgb(var(--accent-rgb) / 0.4); }
+button.preview .icon { width: 14px; height: 14px; }
+.volume-row { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-xs); color: var(--text-3); }
+.volume-row input { flex: 1; accent-color: var(--accent); }
+.sfx-list { display: grid; gap: 4px; }
+.sfx-row { display: grid; grid-template-columns: 1fr 150px auto; align-items: center; gap: var(--s-2); padding: 6px var(--s-2); border-radius: var(--r-sm); background: rgb(255 255 255 / 0.03); }
+.sfx-row select { height: 30px; font: inherit; font-size: var(--fs-xs); color: var(--text); padding: 0 var(--s-2); border-radius: var(--r-sm); background: var(--surface-sunken); border: 1px solid var(--border-strong); }
+.event-sounds { justify-content: flex-start; }
+@media (max-width: 720px) { .music-grid { grid-template-columns: 1fr 1fr; } }

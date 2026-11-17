@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
 import { SoundFx, collisionSound } from './audio';
 import { Controls } from './controls';
+import { Music } from './music';
 import { keyLabel } from '../spec/controls';
 import type { GameStatus } from './status';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private scoreCarry = 0;
   private lives = 0;
   private elapsedMs = 0;
+  private readonly music: Music;
   private invulnerableUntil = 0;
 
   constructor(
@@ -53,6 +55,7 @@ export class GameScene extends Phaser.Scene {
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
+    this.music = new Music(() => sfx.output());
     // Registered once (not per round) so restarts don't stack listeners.
     controls.onPress('sound', () => {
       if (!this.sys.isActive()) return;
@@ -108,6 +111,8 @@ export class GameScene extends Phaser.Scene {
     this.physics.resume();
     this.sfx.unlock();
     this.sfx.play('start');
+    this.music.start(this.spec.audio.music, this.spec.audio.volume);
+    this.events.once('shutdown', () => this.music.stop());
     for (const rule of this.spec.spawns) {
       this.time.delayedCall(rule.startDelayMs, () => {
         this.trySpawn(rule);
@@ -241,6 +246,7 @@ export class GameScene extends Phaser.Scene {
     this.phase = 'over';
     this.won = won;
     this.reportStatus();
+    this.music.stop();
     this.physics.pause();
     this.time.removeAllEvents();
     this.sfx.play(won ? 'win' : 'lose');

@@ -47,6 +47,9 @@ export const PlayerSchema = z.object({
   lives: z.number().int().min(1).max(9),
 });
 
+export const MUSIC_STYLES = ['none', 'chill', 'arcade', 'spooky', 'upbeat', 'dreamy'] as const;
+export type MusicStyle = (typeof MUSIC_STYLES)[number];
+
 export const BEHAVIORS = ['straight', 'zigzag', 'chase', 'flee', 'wander', 'bounce', 'static'] as const;
 
 export const EntitySchema = z.object({
@@ -115,6 +118,13 @@ const GameSpecBase = z
         .optional()
         .describe('Lose when time runs out. Losing all lives always ends the game.'),
     }),
+    audio: z
+      .object({
+        music: z.enum(MUSIC_STYLES).default('none').describe('Background music style, played during a round'),
+        volume: z.number().min(0).max(1).default(0.5),
+      })
+      .default({ music: 'none', volume: 0.5 })
+      .describe('Optional background music; pick a style that fits the mood'),
     messages: z.object({
       intro: z.string().max(160),
       win: z.string().max(160),

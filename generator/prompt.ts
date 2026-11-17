@@ -43,6 +43,7 @@ Rules:
 - Every sprite referenced by player/entities must exist in "sprites"; every spawn.entity must exist in "entities".
 - Give entities personality through names and short quotes that fit the user's idea.
 - Set "faces" to "left" or "right" for sprites drawn facing a direction (fish, cars), otherwise "none".
+- Pick "audio.music" to fit the mood (chill, arcade, spooky, upbeat or dreamy), or "none".
 
 ${SPRITE_RULES}
 

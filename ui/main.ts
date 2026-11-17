@@ -14,6 +14,7 @@ import { createStoryboard } from './studio/storyboard';
 import { keyLabel } from '../spec/controls';
 import { createCharacterCreator } from './studio/character';
 import { createDebugger } from './studio/debugger';
+import { createSoundDesigner } from './studio/sound';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
 import { decodeSpec, sharedFromHash } from './share';
 import { createShareDialog } from './shareDialog';
@@ -561,6 +562,7 @@ function commands(): Command[] {
       id: 'recent', group: 'Navigate', title: 'Show recently played games', keywords: 'history library last',
       run: () => setLibQuery({ filter: 'recent' }),
     },
+    { id: 'sound-designer', group: 'Studio', title: 'Sound Designer', keywords: 'music audio sfx soundtrack effects', disabled: !current, run: () => soundTool.open() },
     { id: 'debug', group: 'Studio', title: 'Debug this game', keywords: 'bug problem broken fix help not working', disabled: !current, run: () => debugTool.open() },
     { id: 'character', group: 'Studio', title: 'Character Creator', keywords: 'hero player sprite create design avatar', run: () => characterTool.open() },
     { id: 'stats', group: 'Navigate', title: 'Stats & personal bests', keywords: 'leaderboard high score scores playtime trophy', run: () => void statsPanel.open() },
@@ -684,11 +686,13 @@ const storyboardTool = createStoryboard($('overlays'), studio);
 storyboardBtn.addEventListener('click', () => storyboardTool.open(promptBox.value.trim()));
 const characterTool = createCharacterCreator($('overlays'), studio);
 const debugTool = createDebugger($('overlays'), studio);
+const soundTool = createSoundDesigner($('overlays'), studio);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */
 const studioItems: MenuItem[] = [
   { label: 'Character Creator', hint: 'Describe a hero; get a sprite and stats', icon: STUDIO_ICONS.character, run: () => characterTool.open() },
+  { label: 'Sound Designer', hint: 'Background music and collision sounds', icon: STUDIO_ICONS.sound, run: () => soundTool.open(), disabled: noGame },
   { label: 'Debug this game', hint: 'Describe a problem; get a diagnosis and fix', icon: STUDIO_ICONS.debug, run: () => debugTool.open(), disabled: noGame },
 ];
 createMenu($<HTMLButtonElement>('studio'), $('studio-menu'), studioItems);

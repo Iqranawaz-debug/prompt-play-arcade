@@ -52,7 +52,7 @@ export class SoundFx {
       if (typeof AudioContext === 'undefined') return;
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.18;
+      this.master.gain.value = this.muted ? 0 : 0.18;
       this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
@@ -60,7 +60,14 @@ export class SoundFx {
 
   toggleMute(): boolean {
     this.muted = !this.muted;
+    // Muting silences everything routed through master, including music.
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.18, this.ctx.currentTime, 0.02);
     return this.muted;
+  }
+
+  /** The audio graph for other voices (music); undefined until unlock() ran. */
+  output(): { ctx: AudioContext; out: GainNode } | undefined {
+    return this.ctx && this.master ? { ctx: this.ctx, out: this.master } : undefined;
   }
 
   play(name: SoundName | undefined): void {
