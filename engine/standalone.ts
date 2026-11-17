@@ -7,7 +7,7 @@ declare global {
   interface Window {
     __GAME_SPEC__?: unknown;
     /** Optional player preferences injected by the dashboard (absent in exported files). */
-    __GAME_OPTIONS__?: { muted?: boolean; maxZoom?: number };
+    __GAME_OPTIONS__?: { muted?: boolean; maxZoom?: number; keys?: unknown };
   }
 }
 
@@ -40,6 +40,7 @@ const prefs = window.__GAME_OPTIONS__ ?? {};
 runGame(window.__GAME_SPEC__, parent, {
   muted: prefs.muted === true,
   maxZoom: typeof prefs.maxZoom === 'number' ? prefs.maxZoom : undefined,
+  keys: prefs.keys,
   onStatus: (status) => post({ type: 'status', status }),
 })
   .then(() => post({ type: 'ready' }))

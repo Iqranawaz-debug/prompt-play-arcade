@@ -1,4 +1,5 @@
 /** Per-viewer preferences, kept in localStorage (they never leave this browser). */
+import { DEFAULT_KEYS, normalizeKeyMap, type KeyMap } from '../spec/controls';
 
 export const THEMES = [
   { id: 'ember', name: 'Ember', swatch: ['#ffb454', '#8f80f5'] },
@@ -23,6 +24,8 @@ export interface Settings {
   previewGlow: boolean;
   /** Render resolution of games: sharp uses more GPU on large screens. */
   previewQuality: 'sharp' | 'balanced';
+  /** Remapped game keys. */
+  keys: KeyMap;
 }
 
 export const DEFAULTS: Settings = {
@@ -36,6 +39,7 @@ export const DEFAULTS: Settings = {
   previewHints: true,
   previewGlow: true,
   previewQuality: 'sharp',
+  keys: DEFAULT_KEYS,
 };
 
 const KEY = 'gg.settings.v1';
@@ -46,6 +50,7 @@ function read(): Settings {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>;
     const merged = { ...DEFAULTS, ...raw };
     if (!THEMES.some((t) => t.id === merged.theme)) merged.theme = DEFAULTS.theme;
+    merged.keys = normalizeKeyMap(raw.keys);
     return merged;
   } catch {
     return { ...DEFAULTS };

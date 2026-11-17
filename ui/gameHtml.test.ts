@@ -26,3 +26,11 @@ describe('buildGameHtml', () => {
     expect(html).toContain('&lt;/title&gt;');
   });
 });
+
+describe('play options', () => {
+  it('injects player options safely (no script break-out via key names)', () => {
+    const html = buildGameHtml(spec, '', { muted: true, keys: { up: ['</script><script>x'], down: [], left: [], right: [], start: [], sound: [] } as never });
+    expect(html.match(/<\/script/gi)).toHaveLength(2);
+    expect(html).toContain('"muted":true');
+  });
+});

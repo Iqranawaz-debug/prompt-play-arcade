@@ -43,6 +43,7 @@ export class GamePlayer {
     const frame = document.createElement('iframe');
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('referrerpolicy', 'no-referrer');
+    frame.setAttribute('allow', 'gamepad'); // controllers work inside the sandboxed game
     frame.title = spec.title;
     frame.srcdoc = html;
     // Give the game keyboard focus when it loads, unless the user moved on while it was loading

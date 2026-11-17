@@ -11,6 +11,7 @@ import { createStatsPanel } from './statsPanel';
 import { createHistoryPanel } from './history';
 import type { StudioContext } from './studio/context';
 import { createStoryboard } from './studio/storyboard';
+import { keyLabel } from '../spec/controls';
 import { createCharacterCreator } from './studio/character';
 import { createDebugger } from './studio/debugger';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
@@ -158,6 +159,7 @@ const player = new GamePlayer(
     // Muted if sound is off in Settings, or this game was generated as a quiet game.
     muted: !getSettings().gameSound || allGames.find((g) => g.id === activeId)?.options?.sound === false,
     maxZoom: getSettings().previewQuality === 'balanced' ? 1.25 : undefined,
+    keys: getSettings().keys,
   }),
 );
 
@@ -500,6 +502,14 @@ for (const chip of ideaChips) {
 }
 
 applySettings();
+
+/** Key hints under the preview follow the player's bindings. */
+onSettings(({ keys }) => {
+  const kbd = (code: string) => `<kbd>${keyLabel(code).replace(/[<>&]/g, '')}</kbd>`;
+  $('stage-hint').innerHTML =
+    `<span>${kbd(keys.left[0])} ${kbd(keys.right[0])} or drag to move</span>` +
+    `<span>${kbd(keys.start[0])} to start</span><span>${kbd(keys.sound[0])} sound</span>`;
+});
 createNotificationCenter($<HTMLButtonElement>('open-notifications'), $('notif-count'), $('notif-panel'), $('toasts'));
 
 /** Everything the command palette can do, built from current state each time it opens. */

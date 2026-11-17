@@ -3,6 +3,8 @@ import { GameSpecSchema } from '../spec/schema';
 import { GameScene } from './GameScene';
 import { SoundFx } from './audio';
 import type { GameStatus } from './status';
+import { Controls } from './controls';
+import { normalizeKeyMap } from '../spec/controls';
 import { rasterizeSprites } from './textures';
 import { setTextResolution } from './ui';
 import { WORLD, renderZoom } from './world';
@@ -16,6 +18,8 @@ export interface RunOptions {
   muted?: boolean;
   /** Upper bound on render zoom; lower is lighter on the GPU. */
   maxZoom?: number;
+  /** Remapped keys (KeyboardEvent.code per action); defaults when omitted. */
+  keys?: unknown;
 }
 
 /** Validate a spec and start it inside `parent`. Throws if the spec is invalid. */
@@ -40,6 +44,6 @@ export async function runGame(input: unknown, parent: HTMLElement, options: RunO
     // otherwise pull focus into the frame at an arbitrary moment (e.g. while the user types in a dialog).
     autoFocus: false,
     audio: { noAudio: true }, // sounds come from our own Web Audio synth
-    scene: [new GameScene(spec, canvases, sfx, zoom, options.onStatus)],
+    scene: [new GameScene(spec, canvases, sfx, zoom, options.onStatus, new Controls(normalizeKeyMap(options.keys)))],
   });
 }

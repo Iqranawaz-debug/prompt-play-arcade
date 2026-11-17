@@ -1,5 +1,6 @@
 import { createModal, h, type Modal } from './modal';
 import { DEFAULTS, THEMES, getSettings, onSettings, updateSettings, type Settings } from './settings';
+import { ACTIONS, DEFAULT_KEYS, keyLabel, rebind, type Action } from '../spec/controls';
 
 type BoolKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 
@@ -37,6 +38,64 @@ function themePicker(): HTMLElement {
   return grid;
 }
 
+/** Click a key slot, press the new key (Escape cancels). Taking a key from another action removes it there. */
+function controlsEditor(): HTMLElement {
+  const list = h('div', { class: 'controls-list' });
+  let capturing: (() => void) | undefined;
+
+  const slot = (action: Action, index: 0 | 1, label: string) => {
+    const code = getSettings().keys[action][index];
+    const b = h('button', { type: 'button', class: `keyslot${code ? '' : ' empty'}`, textContent: code ? keyLabel(code) : 'Add', attrs: { 'aria-label': `${label}: ${index === 0 ? 'primary' : 'secondary'} key ${code ? keyLabel(code) : 'not set'}. Click to change.` } });
+    b.addEventListener('click', () => {
+      capturing?.();
+      b.textContent = 'Press a key…';
+      b.classList.add('listening');
+      const onKey = (e: KeyboardEvent) => {
+        e.preventDefault();
+        e.stopImmediatePropagation(); // don't let Escape close the drawer, or the key reach anything else
+        stop();
+        if (e.key !== 'Escape') updateSettings({ keys: rebind(getSettings().keys, action, index, e.code) });
+        else render();
+      };
+      const stop = () => {
+        window.removeEventListener('keydown', onKey, true);
+        capturing = undefined;
+      };
+      window.addEventListener('keydown', onKey, true);
+      capturing = () => {
+        stop();
+        render();
+      };
+    });
+    return b;
+  };
+
+  const render = () =>
+    list.replaceChildren(...ACTIONS.map((a) => h('div', { class: 'setting-row control-row' }, h('div', { class: 'setting-text' }, h('strong', { textContent: a.name })), h('div', { class: 'keyslots' }, slot(a.id, 0, a.name), slot(a.id, 1, a.name)))));
+  onSettings(render);
+
+  const pad = h('p', { class: 'pad-status', attrs: { role: 'status' } });
+  const showPad = () => {
+    const p = (navigator.getGamepads?.() ?? []).find((g) => g?.connected);
+    pad.textContent = p ? `Gamepad connected: ${p.id.slice(0, 48)}` : 'No gamepad detected. Press a button on a connected controller.';
+    pad.classList.toggle('on', Boolean(p));
+  };
+  window.addEventListener('gamepadconnected', showPad);
+  window.addEventListener('gamepaddisconnected', showPad);
+  showPad();
+
+  const reset = h('button', { type: 'button', class: 'ghost', textContent: 'Reset controls' });
+  reset.addEventListener('click', () => updateSettings({ keys: structuredClone(DEFAULT_KEYS) }));
+  return h(
+    'div',
+    {},
+    list,
+    h('p', { class: 'setting-text' }, h('span', { textContent: 'Gamepad: left stick or D-pad moves, A or Start begins, Y toggles sound. Changes apply on the next play or restart.' })),
+    pad,
+    reset,
+  );
+}
+
 const section = (title: string, ...rows: HTMLElement[]) => h('section', { class: 'drawer-section' }, h('h3', { textContent: title }), ...rows);
 
 /** The customization drawer (Settings). */
@@ -53,7 +112,8 @@ export function createSettingsDrawer(host: HTMLElement): Modal {
       'div',
       { class: 'drawer-body' },
       section('Theme', themePicker()),
-      section('Sound', toggle('gameSound', 'Game sound effects', 'Start games with sound on. M still toggles it in game.')),
+      section('Sound', toggle('gameSound', 'Game sound effects', 'Start games with sound on. The sound key still toggles it in game.')),
+      section('Controls', controlsEditor()),
       section(
         'Animation',
         segmented('motion', 'Motion', [

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
 import { SoundFx, collisionSound } from './audio';
+import { Controls } from './controls';
+import { keyLabel } from '../spec/controls';
 import type { GameStatus } from './status';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { registerTextures, sizeSprite, texKey } from './textures';
@@ -17,7 +19,6 @@ interface EntityState {
   cooldownUntil: number;
 }
 
-type Keys = Record<'W' | 'A' | 'S' | 'D' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT', Phaser.Input.Keyboard.Key>;
 
 const HIT_COOLDOWN_MS = 800;
 const INVULNERABLE_MS = 1200;
@@ -27,7 +28,6 @@ export class GameScene extends Phaser.Scene {
   private player!: Body;
   private entities!: Phaser.Physics.Arcade.Group;
   private hud!: Hud;
-  private keys?: Keys;
   private readonly state = new WeakMap<Phaser.GameObjects.GameObject, EntityState>();
   private readonly entityById: Map<string, EntitySpec>;
 
@@ -48,9 +48,22 @@ export class GameScene extends Phaser.Scene {
     private readonly zoom = 1,
     /** Told whenever the phase, score or lives change (the dashboard shows it as live badges). */
     private readonly onStatus: (status: GameStatus) => void = () => {},
+    /** Keyboard (remappable) and gamepad input, shared across round restarts. */
+    private readonly controls: Controls = new Controls(),
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
+    // Registered once (not per round) so restarts don't stack listeners.
+    controls.onPress('sound', () => {
+      if (!this.sys.isActive()) return;
+      this.sfx.unlock();
+      toast(this, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme);
+    });
+  }
+
+  /** "Click or press Space to start" with the player's actual key. */
+  private cta(verb: string): string {
+    return `Click or press ${keyLabel(this.controls.firstKey('start'))} to ${verb}`;
   }
 
   create(): void {
@@ -76,20 +89,16 @@ export class GameScene extends Phaser.Scene {
     this.entities = this.physics.add.group();
     this.physics.add.overlap(this.player, this.entities, (_p, e) => this.onTouch(e as Body));
 
-    this.keys = this.input.keyboard?.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT') as Keys | undefined;
     this.hud = new Hud(this, spec.theme, spec.score.label);
     this.refreshHud();
-    this.input.keyboard?.on('keydown-M', () => {
-      this.sfx.unlock();
-      toast(this, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme);
-    });
 
     this.physics.pause();
     showOverlay(
       this,
       spec.theme,
-      { eyebrow: 'Ready to play', title: spec.title, body: spec.messages.intro, cta: 'Click or press Space to start' },
+      { eyebrow: 'Ready to play', title: spec.title, body: spec.messages.intro, cta: this.cta('start') },
       () => this.startRound(),
+      this.controls,
     );
   }
 
@@ -127,6 +136,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    this.controls.poll(); // gamepad buttons work on the start and end cards too
     if (this.phase !== 'playing') return;
     this.elapsedMs += delta;
     this.movePlayer();
@@ -144,13 +154,7 @@ export class GameScene extends Phaser.Scene {
 
   private movePlayer(): void {
     const { player, spec } = this;
-    const k = this.keys;
-    let dx = 0;
-    let dy = 0;
-    if (k) {
-      dx = Number(k.RIGHT.isDown || k.D.isDown) - Number(k.LEFT.isDown || k.A.isDown);
-      dy = Number(k.DOWN.isDown || k.S.isDown) - Number(k.UP.isDown || k.W.isDown);
-    }
+    let { x: dx, y: dy } = this.controls.axis();
     let speed = spec.player.speed;
     const pointer = this.input.activePointer;
     if (dx === 0 && dy === 0 && pointer.isDown) {
@@ -249,10 +253,11 @@ export class GameScene extends Phaser.Scene {
         title: won ? 'You win!' : 'Game over',
         body: won ? spec.messages.win : spec.messages.lose,
         stat: { value: String(this.score), label: spec.score.label },
-        cta: 'Click or press Space to play again',
+        cta: this.cta('play again'),
         tone: won ? 'win' : 'lose',
       },
       () => this.scene.restart(),
+      this.controls,
     );
   }
 

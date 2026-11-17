@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import type { GameSpec } from '../spec/schema';
 import { CHROME, FONT, inkOn, rgba, shade } from './colors';
 import { paintedImage, roundedPath } from './paint';
+import type { Controls } from './controls';
+import { keyLabel } from '../spec/controls';
 import { FIELD, HUD_H, WORLD } from './world';
 
 export { FONT };
@@ -201,7 +203,7 @@ function drawCard(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 }
 
 /** Centered card that waits for a click or Space before calling `onContinue`. */
-export function showOverlay(scene: Phaser.Scene, theme: Theme, content: OverlayContent, onContinue: () => void): void {
+export function showOverlay(scene: Phaser.Scene, theme: Theme, content: OverlayContent, onContinue: () => void, controls: Controls): void {
   const { width: W, height: H } = WORLD;
   const tone = TONES[content.tone ?? 'neutral'] ?? theme.primary;
   const wrap = { width: CARD_W - CARD_PAD * 2, useAdvancedWrap: true };
@@ -262,9 +264,9 @@ export function showOverlay(scene: Phaser.Scene, theme: Theme, content: OverlayC
   y += ctaH + 16;
 
   // Keycap hint: [M] sound
-  const key = scene.add.text(0, 0, 'M', textStyle(11, CHROME.text2, { fontStyle: '700' })).setOrigin(0.5);
+  const key = scene.add.text(0, 0, keyLabel(controls.firstKey('sound')), textStyle(11, CHROME.text2, { fontStyle: '700' })).setOrigin(0.5);
   const hint = scene.add.text(0, 0, 'toggle sound', textStyle(12, CHROME.text3)).setOrigin(0, 0.5);
-  const capW = 22;
+  const capW = Math.max(22, key.width + 12);
   const hintW = capW + 8 + hint.width;
   const hintX = cx - hintW / 2;
   const cap = scene.add.graphics();
@@ -291,17 +293,19 @@ export function showOverlay(scene: Phaser.Scene, theme: Theme, content: OverlayC
   scene.tweens.add({ targets: dim, alpha: 0.6, duration: 240 });
   scene.tweens.add({ targets: ctaGroup, scale: 1.04, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
+  let unsubscribe = () => {};
   const go = () => {
     scene.input.off('pointerdown', go);
-    scene.input.keyboard?.off('keydown-SPACE', go);
+    unsubscribe();
     onContinue();
     scene.tweens.add({ targets: root, alpha: 0, duration: 140, onComplete: () => root.destroy() });
   };
   // Small delay so the click that ended the last round does not skip this card.
   scene.time.delayedCall(300, () => {
     scene.input.once('pointerdown', go);
-    scene.input.keyboard?.once('keydown-SPACE', go);
+    unsubscribe = controls.onPress('start', go);
   });
+  scene.events.once('shutdown', () => unsubscribe());
 }
 
 // ---------------------------------------------------------------- Popups

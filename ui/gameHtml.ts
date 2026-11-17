@@ -1,4 +1,5 @@
 import type { GameSpec } from '../spec/schema';
+import type { KeyMap } from '../spec/controls';
 
 /** The game page may run inline scripts and draw data: images, and nothing else: no network at all. */
 const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:";
@@ -10,6 +11,7 @@ const escapeHtml = (s: string) =>
 export interface PlayOptions {
   muted?: boolean;
   maxZoom?: number;
+  keys?: KeyMap;
 }
 
 /** Build a complete, self-contained HTML document that runs `spec` with the bundled engine. */
@@ -17,7 +19,7 @@ export function buildGameHtml(spec: GameSpec, engineSrc: string, options?: PlayO
   // Neither payload may close the <script> element it lives in.
   const specJson = JSON.stringify(spec).replace(/</g, '\\u003c');
   const engine = engineSrc.replace(/<\/script/gi, '<\\/script');
-  const opts = options ? `window.__GAME_OPTIONS__=${JSON.stringify({ muted: Boolean(options.muted), maxZoom: options.maxZoom })};` : '';
+  const opts = options ? `window.__GAME_OPTIONS__=${JSON.stringify({ muted: Boolean(options.muted), maxZoom: options.maxZoom, keys: options.keys }).replace(/</g, '\\u003c')};` : '';
   return `<!doctype html>
 <html lang="en">
 <head>
