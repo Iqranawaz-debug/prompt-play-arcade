@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jumpReach, startTile, unreachable } from './reach';
+import { RuleSchema, ruleRefs } from './rules';
 import { DEFAULT_TILE, MAP_CHARS, jumpHeight, maxCols, maxRows, parseLevel, platformTops } from './level';
 
 /** Lowercase identifier used to cross-reference sprites and entities. */
@@ -170,6 +171,11 @@ const GameSpecBase = z
       .optional()
       .describe("Optional sequence of levels played in order (instead of level); the win condition applies to each level"),
     physics: PhysicsSchema.optional(),
+    rules: z
+      .array(RuleSchema)
+      .max(20)
+      .optional()
+      .describe('Optional game logic: when <trigger>, if <conditions>, then <actions>'),
     audio: z
       .object({
         music: z.enum(MUSIC_STYLES).default('none').describe('Background music style, played during a round'),
@@ -207,6 +213,9 @@ export const GameSpecSchema = GameSpecBase.superRefine((spec, ctx) => {
   if (spec.win.type === 'survive' && spec.lose.timeLimitSeconds !== undefined) {
     issue(['lose', 'timeLimitSeconds'], 'a survive win cannot also have a time limit');
   }
+  spec.rules?.forEach((r, i) => {
+    for (const ref of ruleRefs(r)) if (!entityIds.has(ref)) issue(['rules', i], `rule "${r.name}" mentions unknown entity "${ref}"`);
+  });
   checkLevel(spec, issue);
   checkBalance(spec, issue);
 });
