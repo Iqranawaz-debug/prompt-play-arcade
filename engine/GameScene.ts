@@ -4,6 +4,7 @@ import { SoundFx, collisionSound } from './audio';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, formatTime, popText, showOverlay } from './ui';
+import { FIELD, WORLD } from './world';
 
 type Body = Phaser.Types.Physics.Arcade.ImageWithDynamicBody;
 type Phase = 'intro' | 'playing' | 'over';
@@ -40,6 +41,8 @@ export class GameScene extends Phaser.Scene {
     private readonly spec: GameSpec,
     private readonly canvases: Map<string, HTMLCanvasElement>,
     private readonly sfx: SoundFx = new SoundFx(),
+    /** Real pixels per logical pixel; the camera zooms by this so the 960x540 world fills a sharper canvas. */
+    private readonly zoom = 1,
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
@@ -47,7 +50,6 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     const { spec } = this;
-    const { width: W, height: H } = this.scale;
     this.phase = 'intro';
     this.score = 0;
     this.scoreCarry = 0;
@@ -56,10 +58,12 @@ export class GameScene extends Phaser.Scene {
     this.invulnerableUntil = 0;
 
     registerTextures(this, this.canvases);
-    this.cameras.main.setBackgroundColor(spec.theme.background);
-    this.physics.world.setBounds(0, 0, W, H);
+    this.cameras.main.setBackgroundColor(spec.theme.background).setZoom(this.zoom).centerOn(WORLD.width / 2, WORLD.height / 2);
+    // The player and walls live in the field below the HUD bar, so the HUD never covers gameplay.
+    this.physics.world.setBounds(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
 
-    this.player = this.physics.add.image(spec.player.start.x * W, spec.player.start.y * H, texKey(spec.player.sprite));
+    const start = { x: FIELD.x + spec.player.start.x * FIELD.w, y: FIELD.y + spec.player.start.y * FIELD.h };
+    this.player = this.physics.add.image(start.x, start.y, texKey(spec.player.sprite));
     sizeSprite(this.player, spec.sprites[spec.player.sprite]);
     this.player.setCollideWorldBounds(true).setDepth(10);
 
@@ -71,14 +75,14 @@ export class GameScene extends Phaser.Scene {
     this.refreshHud();
     this.input.keyboard?.on('keydown-M', () => {
       this.sfx.unlock();
-      popText(this, this.scale.width / 2, 60, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme.text);
+      popText(this, WORLD.width / 2, FIELD.y + 40, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme.text);
     });
 
     this.physics.pause();
     showOverlay(
       this,
       spec.theme,
-      { title: spec.title, body: spec.messages.intro, footer: 'Click or press Space to start  -  M toggles sound' },
+      { title: spec.title, body: spec.messages.intro, footer: 'Click or press Space to start  ·  M toggles sound' },
       () => this.startRound(),
     );
   }
@@ -103,12 +107,11 @@ export class GameScene extends Phaser.Scene {
     if (alive >= rule.maxAlive) return;
 
     const def = this.spec.sprites[spec.sprite];
-    const world = { w: this.scale.width, h: this.scale.height };
-    const { pos, dir } = placeSpawn(rule.edge, { w: def.width, h: def.height }, world, this.player);
+    const { pos, dir } = placeSpawn(rule.edge, { w: def.width, h: def.height }, FIELD, this.player);
     if (spec.behavior === 'static') {
-      // Static entities must sit inside the screen to be reachable.
-      pos.x = Phaser.Math.Clamp(pos.x, def.width, world.w - def.width);
-      pos.y = Phaser.Math.Clamp(pos.y, def.height, world.h - def.height);
+      // Static entities must sit inside the field to be reachable.
+      pos.x = Phaser.Math.Clamp(pos.x, FIELD.x + def.width, FIELD.x + FIELD.w - def.width);
+      pos.y = Phaser.Math.Clamp(pos.y, FIELD.y + def.height, FIELD.y + FIELD.h - def.height);
     }
 
     const sprite = this.entities.create(pos.x, pos.y, texKey(spec.sprite)) as Body;
@@ -163,18 +166,17 @@ export class GameScene extends Phaser.Scene {
   private moveEntity(sprite: Body, delta: number): void {
     const s = this.state.get(sprite);
     if (!s) return;
-    const world = { w: this.scale.width, h: this.scale.height };
     const half = { w: sprite.displayWidth / 2, h: sprite.displayHeight / 2 };
 
     let vel = steer(s.spec.behavior, s.mover, sprite, this.player, s.spec.speed, delta);
-    if (!s.entered && isInside(sprite, half, world)) s.entered = true;
+    if (!s.entered && isInside(sprite, half, FIELD)) s.entered = true;
     if (s.entered && !s.mover.leaving && CONTAINED.has(s.spec.behavior)) {
-      vel = bounceOffWalls(s.mover, vel, sprite, half, world);
+      vel = bounceOffWalls(s.mover, vel, sprite, half, FIELD);
     }
     sprite.setVelocity(vel.x, vel.y);
     this.face(sprite, s.spec.sprite, vel.x);
 
-    if (isFarOutside(sprite, half, world) && (s.entered || s.mover.ageMs > 4000)) sprite.destroy();
+    if (isFarOutside(sprite, half, FIELD) && (s.entered || s.mover.ageMs > 4000)) sprite.destroy();
   }
 
   /** Mirror a sprite so it faces its direction of travel. */

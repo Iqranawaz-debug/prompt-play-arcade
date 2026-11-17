@@ -10,6 +10,12 @@ export interface Size {
   h: number;
 }
 
+/** An axis-aligned area, e.g. the playfield below the HUD. */
+export interface Rect extends Size {
+  x: number;
+  y: number;
+}
+
 export interface MoverState {
   dir: Vec;
   ageMs: number;
@@ -35,27 +41,27 @@ const rotate = (v: Vec, a: number): Vec => ({
   y: v.x * Math.sin(a) + v.y * Math.cos(a),
 });
 
-/** Where a new entity appears and which way it initially heads. */
+/** Where a new entity appears (just outside the given edge of the field) and which way it heads. */
 export function placeSpawn(
   edge: SpawnSpec['edge'],
   size: Size,
-  world: Size,
+  field: Rect,
   player: Vec,
   rng: Rng = Math.random,
 ): { pos: Vec; dir: Vec } {
   const resolved = edge === 'sides' ? (rng() < 0.5 ? 'left' : 'right') : edge;
   const margin = 40;
-  const randX = () => margin + rng() * (world.w - margin * 2);
-  const randY = () => margin + rng() * (world.h - margin * 2);
+  const randX = () => field.x + margin + rng() * (field.w - margin * 2);
+  const randY = () => field.y + margin + rng() * (field.h - margin * 2);
   switch (resolved) {
     case 'top':
-      return { pos: { x: randX(), y: -size.h / 2 }, dir: { x: 0, y: 1 } };
+      return { pos: { x: randX(), y: field.y - size.h / 2 }, dir: { x: 0, y: 1 } };
     case 'bottom':
-      return { pos: { x: randX(), y: world.h + size.h / 2 }, dir: { x: 0, y: -1 } };
+      return { pos: { x: randX(), y: field.y + field.h + size.h / 2 }, dir: { x: 0, y: -1 } };
     case 'left':
-      return { pos: { x: -size.w / 2, y: randY() }, dir: { x: 1, y: 0 } };
+      return { pos: { x: field.x - size.w / 2, y: randY() }, dir: { x: 1, y: 0 } };
     case 'right':
-      return { pos: { x: world.w + size.w / 2, y: randY() }, dir: { x: -1, y: 0 } };
+      return { pos: { x: field.x + field.w + size.w / 2, y: randY() }, dir: { x: -1, y: 0 } };
     case 'anywhere': {
       // Avoid spawning right on top of the player.
       let pos = { x: randX(), y: randY() };
@@ -115,25 +121,28 @@ export function steer(
   }
 }
 
-/** Reflect a velocity (and the mover's heading) off the walls it is pressing against. */
-export function bounceOffWalls(state: MoverState, vel: Vec, pos: Vec, half: Size, world: Size): Vec {
+/** Reflect a velocity (and the mover's heading) off the field walls it is pressing against. */
+export function bounceOffWalls(state: MoverState, vel: Vec, pos: Vec, half: Size, field: Rect): Vec {
   const out = { ...vel };
-  if ((pos.x < half.w && vel.x < 0) || (pos.x > world.w - half.w && vel.x > 0)) {
+  if ((pos.x < field.x + half.w && vel.x < 0) || (pos.x > field.x + field.w - half.w && vel.x > 0)) {
     out.x = -vel.x;
     state.dir.x = -state.dir.x;
   }
-  if ((pos.y < half.h && vel.y < 0) || (pos.y > world.h - half.h && vel.y > 0)) {
+  if ((pos.y < field.y + half.h && vel.y < 0) || (pos.y > field.y + field.h - half.h && vel.y > 0)) {
     out.y = -vel.y;
     state.dir.y = -state.dir.y;
   }
   return out;
 }
 
-export const isInside = (pos: Vec, half: Size, world: Size): boolean =>
-  pos.x >= half.w && pos.x <= world.w - half.w && pos.y >= half.h && pos.y <= world.h - half.h;
+export const isInside = (pos: Vec, half: Size, field: Rect): boolean =>
+  pos.x >= field.x + half.w &&
+  pos.x <= field.x + field.w - half.w &&
+  pos.y >= field.y + half.h &&
+  pos.y <= field.y + field.h - half.h;
 
-export const isFarOutside = (pos: Vec, half: Size, world: Size, margin = 80): boolean =>
-  pos.x < -half.w - margin ||
-  pos.x > world.w + half.w + margin ||
-  pos.y < -half.h - margin ||
-  pos.y > world.h + half.h + margin;
+export const isFarOutside = (pos: Vec, half: Size, field: Rect, margin = 80): boolean =>
+  pos.x < field.x - half.w - margin ||
+  pos.x > field.x + field.w + half.w + margin ||
+  pos.y < field.y - half.h - margin ||
+  pos.y > field.y + field.h + half.h + margin;

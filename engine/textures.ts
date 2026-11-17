@@ -3,9 +3,6 @@ import type { GameSpec } from '../spec/schema';
 
 type SpriteDef = GameSpec['sprites'][string];
 
-/** Sprites are rasterised at this multiple of their display size so they stay crisp. */
-const RESOLUTION = 2;
-
 export const texKey = (spriteId: string): string => `spr_${spriteId}`;
 
 function svgDataUrl(svg: string): string {
@@ -22,10 +19,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-async function rasterize(def: SpriteDef): Promise<HTMLCanvasElement> {
+async function rasterize(def: SpriteDef, resolution: number): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
-  canvas.width = def.width * RESOLUTION;
-  canvas.height = def.height * RESOLUTION;
+  canvas.width = def.width * resolution;
+  canvas.height = def.height * resolution;
   const ctx = canvas.getContext('2d')!;
   try {
     ctx.drawImage(await loadImage(svgDataUrl(def.svg)), 0, 0, canvas.width, canvas.height);
@@ -39,10 +36,13 @@ async function rasterize(def: SpriteDef): Promise<HTMLCanvasElement> {
   return canvas;
 }
 
-/** Turn every SVG string in the spec into a canvas, keyed by sprite id. */
-export async function rasterizeSprites(sprites: GameSpec['sprites']): Promise<Map<string, HTMLCanvasElement>> {
+/**
+ * Turn every SVG string in the spec into a canvas, keyed by sprite id. `resolution` is the multiple of the
+ * display size to rasterise at, so sprites stay crisp when the game is rendered zoomed in.
+ */
+export async function rasterizeSprites(sprites: GameSpec['sprites'], resolution = 2): Promise<Map<string, HTMLCanvasElement>> {
   const entries = await Promise.all(
-    Object.entries(sprites).map(async ([id, def]) => [id, await rasterize(def)] as const),
+    Object.entries(sprites).map(async ([id, def]) => [id, await rasterize(def, resolution)] as const),
   );
   return new Map(entries);
 }

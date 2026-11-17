@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { LIFETIME_MS, bounceOffWalls, isFarOutside, newMover, placeSpawn, steer } from './motion';
+import { LIFETIME_MS, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer } from './motion';
 
-const world = { w: 800, h: 600 };
+const world = { x: 0, y: 0, w: 800, h: 600 };
 const size = { w: 40, h: 20 };
 const fixed = (v: number) => () => v;
 
@@ -24,6 +24,24 @@ describe('placeSpawn', () => {
     const { pos } = placeSpawn('anywhere', size, world, { x: 0, y: 0 }, fixed(0.5));
     expect(isFarOutside(pos, { w: 20, h: 10 }, world)).toBe(false);
     expect(pos.x).toBeGreaterThan(0);
+  });
+});
+
+describe('placeSpawn with a HUD offset', () => {
+  const field = { x: 0, y: 44, w: 960, h: 496 };
+  it('spawns top entities just above the field, i.e. hidden under the HUD bar', () => {
+    const { pos } = placeSpawn('top', size, field, { x: 0, y: 0 }, fixed(0.5));
+    expect(pos.y).toBe(44 - size.h / 2);
+  });
+  it('keeps "anywhere" spawns below the HUD', () => {
+    const { pos } = placeSpawn('anywhere', size, field, { x: 0, y: 0 }, fixed(0));
+    expect(pos.y).toBeGreaterThanOrEqual(44 + 40);
+    expect(isInside(pos, { w: 20, h: 10 }, field)).toBe(true);
+  });
+  it('bounces off the top of the field, not the top of the screen', () => {
+    const m = newMover({ x: 0, y: -1 }, 'bounce', fixed(0.5));
+    const v = bounceOffWalls(m, { x: 0, y: -100 }, { x: 400, y: 50 }, { w: 20, h: 10 }, field);
+    expect(v.y).toBe(100);
   });
 });
 
