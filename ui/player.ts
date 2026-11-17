@@ -8,6 +8,8 @@ export interface PlayerCallbacks {
   onError(message: string): void;
   /** Live phase/score/lives from the running game; undefined when no game is loaded. */
   onStatus?(status: GameStatus | undefined): void;
+  /** An app shortcut pressed while the game had focus. */
+  onShortcut?(name: 'palette'): void;
 }
 
 /** Hosts games in a sandboxed iframe: scripts only, opaque origin, no access to this app. */
@@ -27,6 +29,7 @@ export class GamePlayer {
       if (e.data.type === 'ready') this.callbacks.onReady();
       else if (e.data.type === 'error') this.callbacks.onError(String(e.data.message));
       else if (e.data.type === 'status' && isGameStatus(e.data.status)) this.callbacks.onStatus?.(e.data.status);
+      else if (e.data.type === 'shortcut' && e.data.name === 'palette') this.callbacks.onShortcut?.('palette');
     });
   }
 

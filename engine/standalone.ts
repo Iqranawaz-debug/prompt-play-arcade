@@ -12,7 +12,11 @@ declare global {
 }
 
 /** Messages the sandboxed game sends to the app that embeds it. */
-type FrameEvent = { type: 'ready' } | { type: 'error'; message: string } | { type: 'status'; status: GameStatus };
+type FrameEvent =
+  | { type: 'ready' }
+  | { type: 'error'; message: string }
+  | { type: 'status'; status: GameStatus }
+  | { type: 'shortcut'; name: 'palette' };
 export type FrameMessage = FrameEvent & { source: 'game-frame' };
 
 function post(msg: FrameEvent): void {
@@ -23,6 +27,13 @@ const describe = (err: unknown) =>
   err instanceof ZodError ? `Invalid game spec:\n${formatIssues(err)}` : err instanceof Error ? err.message : String(err);
 
 window.addEventListener('error', (e) => post({ type: 'error', message: e.message }));
+// The game has keyboard focus while playing; pass the app's Ctrl/Cmd+K through to the dashboard.
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    post({ type: 'shortcut', name: 'palette' });
+  }
+});
 
 const parent = document.getElementById('game')!;
 const prefs = window.__GAME_OPTIONS__ ?? {};

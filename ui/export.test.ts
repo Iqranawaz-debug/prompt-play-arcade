@@ -40,3 +40,17 @@ describe('generation progress', () => {
     expect(creep(gen, 1e9)).toBeCloseTo(gen.cap);
   });
 });
+
+describe('command palette matching', () => {
+  it('ranks prefix > word > substring > in-order letters, and rejects misses', async () => {
+    const { matchScore } = await import('./palette');
+    const prefix = matchScore('exp', 'Export game');
+    const word = matchScore('game', 'Export game');
+    const letters = matchScore('exg', 'Export game');
+    expect(prefix).toBeGreaterThan(word);
+    expect(word).toBeGreaterThan(letters);
+    expect(letters).toBeGreaterThan(0);
+    expect(matchScore('zzz', 'Export game')).toBe(0);
+    expect(matchScore('', 'anything')).toBe(1);
+  });
+});

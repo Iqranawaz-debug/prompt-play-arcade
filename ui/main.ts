@@ -9,7 +9,8 @@ import { exportGame } from './export';
 import { startAmbient } from './ambient';
 import { createSettingsDrawer } from './drawer';
 import { createNotificationCenter, notify } from './notifications';
-import { applySettings, getSettings, onSettings } from './settings';
+import { createCommandPalette, type Command } from './palette';
+import { THEMES, applySettings, getSettings, motionReduced, onSettings, updateSettings } from './settings';
 import { setButtonLabel } from './icons';
 import { renderLibrary } from './library';
 import { GamePlayer } from './player';
@@ -97,6 +98,7 @@ const player = new GamePlayer(
     onReady: () => showStageError(),
     onError: (message) => showStageError(message),
     onStatus: (s) => showGameStatus(s),
+    onShortcut: () => palette.open(),
   },
   () => ({ muted: !getSettings().gameSound, maxZoom: getSettings().previewQuality === 'balanced' ? 1.25 : undefined }),
 );
@@ -125,8 +127,12 @@ function updateCounter(): void {
   form.classList.toggle('has-prompt', promptBox.value.trim().length >= 3);
 }
 
+/** Latest library contents, for the command palette. */
+let allGames: SavedGame[] = [];
+
 async function refreshLibrary(): Promise<void> {
   const games = await listGames();
+  allGames = games;
   libraryCount.textContent = games.length === 1 ? '1 game' : `${games.length} games`;
   renderLibrary(libraryList, games, activeId, { play, remix, exportHtml, remove });
 }
@@ -279,6 +285,69 @@ for (const chip of ideaChips) {
 
 applySettings();
 createNotificationCenter($<HTMLButtonElement>('open-notifications'), $('notif-count'), $('notif-panel'), $('toasts'));
+
+/** Everything the command palette can do, built from current state each time it opens. */
+function commands(): Command[] {
+  const current = allGames.find((g) => g.id === activeId);
+  const settings = getSettings();
+  const list: Command[] = [
+    {
+      id: 'new', group: 'Create', title: 'Create new game', hint: 'Describe it', keywords: 'generate prompt start',
+      run: () => {
+        setRemixTarget(undefined);
+        promptBox.focus();
+        promptBox.select();
+      },
+    },
+    {
+      id: 'generate', group: 'Create', title: 'Generate from the current prompt', hint: 'Ctrl+Enter', keywords: 'make build',
+      disabled: promptBox.value.trim().length < 3 || Boolean(inFlight),
+      run: () => form.requestSubmit(),
+    },
+    {
+      id: 'remix', group: 'Create', title: current ? `Remix "${current.title}"` : 'Remix the current game', keywords: 'change edit modify',
+      disabled: !current,
+      run: () => current && remix(current),
+    },
+    {
+      id: 'library', group: 'Navigate', title: 'Open library', keywords: 'games list browse',
+      run: () => {
+        const first = libraryList.querySelector<HTMLButtonElement>('.game button.primary');
+        libraryList.scrollTo({ top: 0, behavior: 'smooth' });
+        first?.focus();
+      },
+    },
+    { id: 'notifications', group: 'Navigate', title: 'Show notifications', keywords: 'bell alerts', run: () => $('open-notifications').click() },
+    { id: 'settings', group: 'Settings', title: 'Manage settings', hint: 'Customize', keywords: 'preferences options customize', run: () => settingsDrawer.open() },
+    ...THEMES.map<Command>((t) => ({
+      id: `theme-${t.id}`, group: 'Theme', title: `Switch theme: ${t.name}`, keywords: 'colour color appearance accent',
+      hint: settings.theme === t.id ? 'Current' : undefined,
+      run: () => {
+        updateSettings({ theme: t.id });
+        notify('info', `Theme: ${t.name}`);
+      },
+    })),
+    {
+      id: 'sound', group: 'Settings', title: settings.gameSound ? 'Turn game sound off' : 'Turn game sound on', keywords: 'audio mute volume', hint: 'Next play',
+      run: () => updateSettings({ gameSound: !settings.gameSound }),
+    },
+    {
+      id: 'motion', group: 'Settings', title: motionReduced() ? 'Use full motion' : 'Reduce motion', keywords: 'animation accessibility',
+      run: () => updateSettings({ motion: motionReduced() ? 'full' : 'reduced' }),
+    },
+    { id: 'export', group: 'Current game', title: current ? `Export "${current.title}"` : 'Export game', hint: '.html', keywords: 'download save file', disabled: !current, run: () => current && exportHtml(current) },
+    { id: 'restart', group: 'Current game', title: 'Restart game', keywords: 'reload again replay', disabled: !player.loaded, run: () => restartBtn.click() },
+    { id: 'fullscreen', group: 'Current game', title: 'Toggle fullscreen', keywords: 'full screen expand', disabled: !player.loaded, run: () => fullscreenBtn.click() },
+    ...allGames.map<Command>((g) => ({
+      id: `play-${g.id}`, group: 'Games', title: `Play "${g.title}"`, keywords: g.prompt, hint: g.id === activeId ? 'Playing' : undefined,
+      run: () => void play(g),
+    })),
+  ];
+  return list;
+}
+
+const palette = createCommandPalette($('overlays'), commands);
+$('open-palette').addEventListener('click', () => palette.open());
 const settingsDrawer = createSettingsDrawer($('overlays'));
 $('open-settings').addEventListener('click', () => settingsDrawer.open());
 
