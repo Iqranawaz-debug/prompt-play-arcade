@@ -1,6 +1,7 @@
 import type { GenerateEvent, GenerateProgress } from '../generator/generate';
 import { GameSpecSchema, LevelSchema, type GameSpec } from '../spec/schema';
 import { RuleSchema } from '../spec/rules';
+import { ModSchema } from '../spec/mods';
 import type { GameOptions } from '../spec/gameOptions';
 import { z } from 'zod';
 import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
@@ -131,3 +132,6 @@ export const fetchLevels = (spec: GameSpec, request: string, count: number, sign
 
 export const fetchRules = (spec: GameSpec, request: string, signal?: AbortSignal) =>
   postTool('/api/rules', { spec, request }, z.object({ rules: z.array(RuleSchema) }), 'Could not write rules', signal).then((r) => r.rules);
+
+export const fetchMod = (request: string, signal?: AbortSignal) =>
+  postTool('/api/mod', { request }, z.object({ mod: ModSchema }), 'Could not write the mod', signal).then((r) => r.mod);

@@ -8,7 +8,7 @@ import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isQuotaError, isTransientStatus, type ChatProvider } from '../generator/providers';
 import { AskError } from '../generator/ask';
-import { animateSprite, debugGame, designLevels, writeRules, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
+import { animateSprite, debugGame, designLevels, writeMod, writeRules, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -105,6 +105,9 @@ toolRoute(
 toolRoute('/api/rules', z.object({ spec: GameSpecSchema, request: z.string().trim().min(3).max(600) }), async (b, p, signal) => ({
   rules: await writeRules(p, b.spec, b.request, signal),
 }));
+
+/** A new mod from a description (Game Modding). */
+toolRoute('/api/mod', z.object({ request: z.string().trim().min(3).max(600) }), async (b, p, signal) => ({ mod: await writeMod(p, b.request, signal) }));
 
 app.post('/api/generate', async (req, res) => {
   if (!provider) {

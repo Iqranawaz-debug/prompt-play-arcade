@@ -452,3 +452,23 @@ button.chip-btn { height: 30px; border-radius: 999px; font-size: var(--fs-xs); p
 .block-if > .block-add, .block-then > .block-add { align-self: flex-start; }
 .rule-item:has(.rule-pick[aria-current='true']) { border-color: rgb(var(--accent-rgb) / 0.6); background: rgb(var(--accent-rgb) / 0.08); }
 button.rule-pick[aria-current='true'] { background: transparent; }
+
+/* Game Modding */
+.mod-tabs { max-width: 480px; }
+.mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-2); align-content: start; }
+button.mod-card { height: auto; display: grid; gap: 4px; justify-items: start; text-align: left; white-space: normal; padding: var(--s-2) var(--s-3); border-radius: var(--r-md); }
+button.mod-card.on { border-color: rgb(var(--accent-rgb) / 0.7); background: rgb(var(--accent-rgb) / 0.12); }
+.mod-card strong { font-size: var(--fs-sm); }
+.mod-card span { font-size: var(--fs-xs); color: var(--text-2); font-weight: 400; }
+.mod-card em { font-size: 10px; font-style: normal; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.mod-desc { margin: 0; color: var(--text-2); font-size: var(--fs-sm); }
+.mod-ops { margin: 0; padding-left: 18px; font-size: var(--fs-sm); display: grid; gap: 2px; }
+.mod-preview { display: grid; gap: var(--s-2); margin-top: var(--s-2); }
+.spec-diff { margin: 0; padding-left: 18px; font-size: var(--fs-xs); font-family: ui-monospace, Consolas, monospace; color: var(--text-2); display: grid; gap: 2px; overflow-wrap: anywhere; }
+.spec-issues { margin: 0; padding: var(--s-2); border-radius: var(--r-sm); background: var(--danger-soft); color: var(--danger); font-size: var(--fs-xs); white-space: pre-wrap; max-height: 180px; overflow: auto; }
+.mod-create { display: grid; gap: var(--s-3); }
+.op-kind { font-size: var(--fs-sm); min-width: 120px; }
+.spec-editor { display: grid; gap: var(--s-2); }
+textarea.spec-json { width: 100%; min-height: 340px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.5; tab-size: 2; white-space: pre; resize: vertical; }
+textarea.spec-json { background: var(--surface-sunken); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s-3); }
+button.mod-card { align-content: start; }

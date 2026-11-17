@@ -5,6 +5,7 @@ import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { lintSpec } from '../spec/lint';
 import { z } from 'zod';
 import { RuleSchema, type Rule } from '../spec/rules';
+import { ModSchema, type Mod } from '../spec/mods';
 import { CharacterSchema, DebugResultSchema, FramesResultSchema, levelsResultSchema, rulesResultSchema, type DesignedLevel, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 import { askJson } from './ask';
 import { SPRITE_RULES, jsonSchema } from './prompt';
@@ -167,4 +168,22 @@ Reply with JSON only: {"rules":[...]}`,
     user: `The game:\n${JSON.stringify({ title: spec.title, win: spec.win, lose: spec.lose, player: { lives: spec.player.lives, speed: spec.player.speed }, entities: spec.entities.map((e) => ({ id: e.id, name: e.name, behavior: e.behavior, onCollide: e.onCollide })), rules: spec.rules ?? [] })}\n\nRequest:\n"""${request}"""`,
   });
   return result.rules;
+}
+
+// ---------- Mod writing (Game Modding) ----------
+export async function writeMod(provider: ChatProvider, request: string, signal?: AbortSignal): Promise<Mod> {
+  return askJson(provider, {
+    schema: ModSchema,
+    signal,
+    system: `You design mods for a 2D game maker. A mod is a reusable list of operations that works on ANY game made with it.
+${ENGINE_FACTS}
+Operations scale speeds, spawn rates, sprite sizes, lives, time limits and score targets, recolour the theme, change
+music or gravity, remove hazards, or add rules. Inside rules, refer to the game's main hazard as "@hazard" and its main
+reward as "@reward" (never other entity ids). Use 1-6 operations that capture the request; set v to 1, a short
+lowercase-dash id, a catchy name and a one-sentence description.
+JSON Schema:
+${JSON.stringify(z.toJSONSchema(ModSchema, { io: 'input' }))}
+Reply with JSON only.`,
+    user: `Mod idea:\n"""${request}"""`,
+  });
 }

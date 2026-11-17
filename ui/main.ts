@@ -21,6 +21,7 @@ import { createLevelEditor } from './studio/levelEditor';
 import { aiLevelPanel } from './studio/levelDesigner';
 import { createLogicBuilder } from './studio/logic';
 import { aiRulePanel } from './studio/ruleWriter';
+import { createModding } from './studio/modding';
 import { createSavesDialog } from './savesDialog';
 import type { SaveState } from '../spec/saveState';
 import { createAssetStudio } from './studio/assets';
@@ -575,6 +576,8 @@ function commands(): Command[] {
       run: () => setLibQuery({ filter: 'recent' }),
     },
     { id: 'assets', group: 'Studio', title: 'Asset Studio', keywords: 'sprites colours colors theme images art redraw upload svg', disabled: !current, run: () => assetTool.open() },
+    { id: 'game-modding', group: 'Studio', title: 'Game Modding', keywords: 'mods mod pack turbo zen giants import export share', disabled: !current, run: () => void modTool.open() },
+    { id: 'edit-json', group: 'Studio', title: 'Edit game JSON', keywords: 'json spec raw advanced code', disabled: !current, run: () => void modTool.open('json') },
     { id: 'logic-builder', group: 'Studio', title: 'Logic Builder', keywords: 'rules logic events triggers when then visual scripting', disabled: !current, run: () => logicTool.open() },
     { id: 'level-editor', group: 'Studio', title: 'Level Editor', keywords: 'map tiles walls levels world generator procedural maze', disabled: !current, run: () => levelTool.open() },
     { id: 'animation-studio', group: 'Studio', title: 'Animation Studio', keywords: 'animate frames motion sprite bob walk', disabled: !current, run: () => animationTool.open() },
@@ -711,12 +714,14 @@ const physicsTool = createPhysicsSettings($('overlays'), studio);
 const animationTool = createAnimationStudio($('overlays'), studio);
 const levelTool = createLevelEditor($('overlays'), studio, aiLevelPanel);
 const logicTool = createLogicBuilder($('overlays'), studio, aiRulePanel);
+const modTool = createModding($('overlays'), studio);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */
 const studioItems: MenuItem[] = [
   { label: 'Character Creator', hint: 'Describe a hero; get a sprite and stats', icon: STUDIO_ICONS.character, run: () => characterTool.open() },
   { label: 'Asset Studio', hint: 'Colours and sprites: resize, redraw, upload', icon: STUDIO_ICONS.assets, run: () => assetTool.open(), disabled: noGame },
+  { label: 'Game Modding', hint: 'Apply, build and share mods; edit the game JSON', icon: STUDIO_ICONS.mods, run: () => void modTool.open(), disabled: noGame },
   { label: 'Logic Builder', hint: 'When / If / Then rules that change the game as you play', icon: STUDIO_ICONS.logic, run: () => logicTool.open(), disabled: noGame },
   { label: 'Level Editor', hint: 'Paint maps, generate worlds, design levels with AI', icon: STUDIO_ICONS.levels, run: () => levelTool.open(), disabled: noGame },
   { label: 'Animation Studio', hint: 'Idle and move motions, AI-drawn frames', icon: STUDIO_ICONS.animation, run: () => animationTool.open(), disabled: noGame },

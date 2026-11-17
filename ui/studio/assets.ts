@@ -5,6 +5,7 @@ import { h } from '../modal';
 import { notify } from '../notifications';
 import type { StudioContext } from './context';
 import { createToolDialog } from './dialog';
+import { downloadText } from '../download';
 
 type Sprite = GameSpec['sprites'][string];
 const THEME_KEYS = [
@@ -17,15 +18,6 @@ const THEME_KEYS = [
 function usage(spec: GameSpec, id: string): string {
   const users = [spec.player.sprite === id ? 'Player' : '', ...spec.entities.filter((e) => e.sprite === id).map((e) => e.name)].filter(Boolean);
   return users.length ? users.join(', ') : 'Unused';
-}
-
-function download(name: string, svg: string): void {
-  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-  const a = h('a', { href: url, download: `${name}.svg` });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 /** Asset Studio: theme colours and every sprite (resize, facing, AI redraw, SVG upload, download). */
@@ -125,7 +117,7 @@ export function createAssetStudio(host: HTMLElement, ctx: StudioContext) {
     const uploadBtn = h('button', { type: 'button', textContent: 'Replace with SVG file' });
     uploadBtn.addEventListener('click', () => upload.click());
     const dl = h('button', { type: 'button', class: 'ghost', textContent: 'Download SVG' });
-    dl.addEventListener('click', () => download(selected, s.svg));
+    dl.addEventListener('click', () => downloadText(`${selected}.svg`, s.svg, 'image/svg+xml'));
 
     const editor = h(
       'div',

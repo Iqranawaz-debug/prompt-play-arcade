@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { SaveState } from '../spec/saveState';
+import type { Mod } from '../spec/mods';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
@@ -64,6 +65,7 @@ const db = new Dexie('game-generator') as Dexie & {
   games: EntityTable<SavedGame, 'id'>;
   plays: EntityTable<PlayRecord, 'id'>;
   saves: EntityTable<SaveRecord, 'id'>;
+  mods: EntityTable<Mod & { savedAt: number }, 'id'>;
 };
 db.version(1).stores({ games: 'id, updatedAt' });
 db.version(2)
@@ -78,6 +80,20 @@ db.version(2)
       }),
   );
 db.version(3).stores({ saves: '++id, gameId, createdAt' });
+db.version(4).stores({ mods: 'id, savedAt' });
+
+/** Mods the player made or imported (built-in mods live in code). */
+export async function listMods(): Promise<Mod[]> {
+  return (await db.mods.orderBy('savedAt').reverse().toArray()).map(({ savedAt: _, ...m }) => m);
+}
+
+export async function putMod(mod: Mod): Promise<void> {
+  await db.mods.put({ ...mod, savedAt: Date.now() });
+}
+
+export async function deleteMod(id: string): Promise<void> {
+  await db.mods.delete(id);
+}
 
 /** Saves per game are capped; the oldest go first. */
 export const MAX_SAVES = 10;
