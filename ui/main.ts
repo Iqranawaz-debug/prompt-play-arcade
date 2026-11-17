@@ -4,7 +4,9 @@ import './styles/components.css';
 import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, enhancePrompt, fetchHealth, generateGame } from './api';
-import { addGame, addVersion, currentVersionOf, deleteGame, listGames, markPlayed, restoreVersion, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { addGame, addVersion, currentVersionOf, deleteGame, listGames, listPlays, markPlayed, recordPlay, restoreVersion, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { compact, personalBest } from './stats';
+import { createStatsPanel } from './statsPanel';
 import { createHistoryPanel } from './history';
 import { decodeSpec, sharedFromHash } from './share';
 import { createShareDialog } from './shareDialog';
@@ -103,6 +105,37 @@ function showGameStatus(s: GameStatus | 'loading' | undefined): void {
     gameStats.classList.add('bump');
   }
   lastScore = s.score;
+  void trackRound(s);
+}
+
+// ---------- Personal stats: record finished rounds of library games ----------
+const statBestWrap = $('stat-best-wrap');
+const statBest = $('stat-best');
+let roundStartedAt: number | undefined;
+let lastPhaseSeen: string | undefined;
+
+async function showBest(gameId: string | undefined): Promise<void> {
+  const best = gameId ? personalBest(await listPlays(), gameId) : 0;
+  statBestWrap.hidden = !gameId || best === 0;
+  statBest.textContent = compact(best);
+}
+
+async function trackRound(s: GameStatus): Promise<void> {
+  if (s.phase === lastPhaseSeen) return;
+  lastPhaseSeen = s.phase;
+  if (s.phase === 'playing') {
+    roundStartedAt = Date.now();
+    return;
+  }
+  if ((s.phase !== 'won' && s.phase !== 'lost') || roundStartedAt === undefined) return;
+  const durationMs = Date.now() - roundStartedAt;
+  roundStartedAt = undefined;
+  const game = allGames.find((g) => g.id === activeId);
+  if (!game) return; // shared games that were not saved are not tracked
+  const previousBest = personalBest(await listPlays(), game.id);
+  await recordPlay({ gameId: game.id, title: game.title, result: s.phase, score: s.score, durationMs, endedAt: Date.now() });
+  if (s.score > previousBest && previousBest > 0) notify('success', 'New personal best!', `${compact(s.score)} in "${game.title}" (was ${compact(previousBest)}).`);
+  await showBest(game.id);
 }
 
 const player = new GamePlayer(
@@ -300,6 +333,9 @@ async function play(game: SavedGame): Promise<void> {
   libraryList.querySelector('.game.active')?.scrollIntoView({ block: 'nearest' });
   try {
     lastScore = 0;
+    roundStartedAt = undefined;
+    lastPhaseSeen = undefined;
+    void showBest(game.id);
     await player.play(game.spec);
     // play() resolves once the frame is inserted, before the game inside it can report its first status.
     showGameStatus('loading');
@@ -499,6 +535,7 @@ function commands(): Command[] {
       id: 'recent', group: 'Navigate', title: 'Show recently played games', keywords: 'history library last',
       run: () => setLibQuery({ filter: 'recent' }),
     },
+    { id: 'stats', group: 'Navigate', title: 'Stats & personal bests', keywords: 'leaderboard high score scores playtime trophy', run: () => void statsPanel.open() },
     { id: 'notifications', group: 'Navigate', title: 'Show notifications', keywords: 'bell alerts', run: () => $('open-notifications').click() },
     { id: 'settings', group: 'Settings', title: 'Manage settings', hint: 'Customize', keywords: 'preferences options customize', run: () => settingsDrawer.open() },
     ...THEMES.map<Command>((t) => ({
@@ -563,6 +600,9 @@ async function playShared(spec: GameSpec): Promise<void> {
   renderLibraryView();
   try {
     lastScore = 0;
+    roundStartedAt = undefined;
+    lastPhaseSeen = undefined;
+    void showBest(undefined);
     await player.play(spec);
     showGameStatus('loading');
   } catch (err) {
@@ -592,6 +632,10 @@ $('save-shared').addEventListener('click', async () => {
   notify('success', 'Saved to library', `"${game.title}" is now in your library.`);
   await play(game);
 });
+
+// ---------- Stats ----------
+const statsPanel = createStatsPanel($('overlays'), () => allGames);
+$('open-stats').addEventListener('click', () => void statsPanel.open());
 
 historyBtn.addEventListener('click', () => {
   const game = allGames.find((g) => g.id === activeId);

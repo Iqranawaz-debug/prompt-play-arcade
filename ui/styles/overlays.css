@@ -202,3 +202,42 @@ button.search-trigger:hover:not(:disabled) { color: var(--text-2); }
   background: var(--violet-soft); border: 1px solid rgb(var(--violet-rgb) / 0.4); animation: rise var(--t) var(--ease);
 }
 .shared-banner button { height: 30px; font-size: var(--fs-xs); }
+
+/* ---------- Stats & personal bests ---------- */
+.drawer.stats { width: min(520px, calc(100vw - 2 * var(--s-3))); }
+.stats-body { display: grid; gap: var(--s-5); align-content: start; padding-top: var(--s-4); }
+.kpi-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-2); }
+.kpi { display: grid; gap: 2px; padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--surface-1); border: 1px solid var(--border); min-width: 0; }
+.kpi-label { font-size: var(--fs-xs); color: var(--text-3); }
+.kpi-value { font-size: 26px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--text); }
+.kpi-sub { display: flex; align-items: center; gap: var(--s-2); font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Win-rate meter: accent fill on a lighter step of the same hue. */
+.meter { flex: none; width: 56px; height: 6px; border-radius: 3px; background: rgb(var(--accent-rgb) / 0.2); overflow: hidden; }
+.meter-fill { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+
+.bests { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.bests caption { text-align: left; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding-bottom: var(--s-2); }
+.bests th, .bests td { padding: var(--s-2) var(--s-2); border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; }
+.bests thead th { font-size: 11px; color: var(--text-3); font-weight: 600; }
+.bests .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.bests .strong { color: var(--text); font-weight: 650; }
+.bests-game { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.bests-game .game-cover { width: 32px; height: 32px; border-radius: 8px; flex: none; }
+.bests-game .cover-side { display: none; }
+.cover-missing { width: 32px; height: 32px; border-radius: 8px; background: var(--surface-2); flex: none; }
+
+.recent h3 { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); margin-bottom: var(--s-2); }
+.recent ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.recent li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'res title pts' 'res meta meta'; column-gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: rgb(255 255 255 / 0.03); font-size: var(--fs-sm); }
+.recent .result { grid-area: res; align-self: center; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--r-pill); }
+.recent .result.won { color: var(--success); background: rgb(74 222 128 / 0.12); }
+.recent .result.lost { color: var(--danger); background: var(--danger-soft); }
+.recent-title { grid-area: title; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent .num { grid-area: pts; font-weight: 650; font-variant-numeric: tabular-nums; }
+.recent .muted { grid-area: meta; font-size: 11px; }
+.stats-empty { display: grid; gap: var(--s-1); padding: var(--s-8) var(--s-4); text-align: center; color: var(--text-3); border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+.stats-empty strong { color: var(--text); }
+
+/* "Best" chip beside the live score */
+.stat.best { color: var(--text-2); }
+.stat.best .icon { color: #fcd34d; }

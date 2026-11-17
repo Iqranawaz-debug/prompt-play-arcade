@@ -39,6 +39,11 @@
           <span class="search-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
         </button>
         <span id="model-chip" class="pill">Checking server…</span>
+        <button id="open-stats" type="button" class="icon-btn" aria-label="Your stats and personal bests" title="Stats & personal bests">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" />
+          </svg>
+        </button>
         <div class="notif-wrap">
           <button id="open-notifications" type="button" class="icon-btn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" title="Notifications">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -159,6 +164,12 @@
                   <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
                 </svg>
                 <b id="stat-score">0</b><span id="stat-target" class="muted"></span>
+              </span>
+              <span id="stat-best-wrap" class="stat best" title="Your personal best in this game" hidden>
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" />
+                </svg>
+                Best <b id="stat-best">0</b>
               </span>
               <span class="stat hearts" title="Lives"><span id="stat-lives-full" class="full"></span><span id="stat-lives-empty" class="empty"></span></span>
             </div>
