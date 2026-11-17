@@ -3,7 +3,7 @@ import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
 import { SoundFx, collisionSound } from './audio';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { registerTextures, sizeSprite, texKey } from './textures';
-import { Hud, formatTime, popText, showOverlay } from './ui';
+import { Hud, popScore, quoteBubble, showOverlay, toast, type HudState } from './ui';
 import { FIELD, WORLD } from './world';
 
 type Body = Phaser.Types.Physics.Arcade.ImageWithDynamicBody;
@@ -71,18 +71,18 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.entities, (_p, e) => this.onTouch(e as Body));
 
     this.keys = this.input.keyboard?.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT') as Keys | undefined;
-    this.hud = new Hud(this, spec.theme);
+    this.hud = new Hud(this, spec.theme, spec.score.label);
     this.refreshHud();
     this.input.keyboard?.on('keydown-M', () => {
       this.sfx.unlock();
-      popText(this, WORLD.width / 2, FIELD.y + 40, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme.text);
+      toast(this, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme);
     });
 
     this.physics.pause();
     showOverlay(
       this,
       spec.theme,
-      { title: spec.title, body: spec.messages.intro, footer: 'Click or press Space to start  ·  M toggles sound' },
+      { eyebrow: 'Ready to play', title: spec.title, body: spec.messages.intro, cta: 'Click or press Space to start' },
       () => this.startRound(),
     );
   }
@@ -198,7 +198,7 @@ export class GameScene extends Phaser.Scene {
     const { theme } = this.spec;
     if (score !== 0) {
       this.score = Math.max(0, this.score + score);
-      popText(this, sprite.x, sprite.y - 10, `${score > 0 ? '+' : ''}${score}`, score > 0 ? theme.primary : theme.accent, 24);
+      popScore(this, sprite.x, sprite.y - 10, `${score > 0 ? '+' : ''}${score}`, score > 0 ? theme.primary : theme.accent);
     }
     if (lives < 0) {
       this.lives += lives;
@@ -209,7 +209,7 @@ export class GameScene extends Phaser.Scene {
       this.lives = Math.min(9, this.lives + lives);
     }
     if (s.spec.quotes.length > 0) {
-      popText(this, sprite.x, sprite.y - 40, Phaser.Utils.Array.GetRandom(s.spec.quotes), theme.text, 16);
+      quoteBubble(this, sprite.x, sprite.y - 46, Phaser.Utils.Array.GetRandom(s.spec.quotes), theme);
     }
     if (destroy) sprite.destroy();
     this.refreshHud();
@@ -236,9 +236,12 @@ export class GameScene extends Phaser.Scene {
       this,
       spec.theme,
       {
+        eyebrow: spec.title,
         title: won ? 'You win!' : 'Game over',
-        body: `${won ? spec.messages.win : spec.messages.lose}\n\n${spec.score.label}: ${this.score}`,
-        footer: 'Click or press Space to play again',
+        body: won ? spec.messages.win : spec.messages.lose,
+        stat: { value: String(this.score), label: spec.score.label },
+        cta: 'Click or press Space to play again',
+        tone: won ? 'win' : 'lose',
       },
       () => this.scene.restart(),
     );
@@ -247,10 +250,18 @@ export class GameScene extends Phaser.Scene {
   private refreshHud(): void {
     const { spec } = this;
     const secs = this.elapsedMs / 1000;
-    const target = spec.win.type === 'score' ? ` / ${spec.win.target}` : '';
-    let timer = '';
-    if (spec.win.type === 'survive') timer = `Survive ${formatTime(spec.win.seconds - secs)}`;
-    else if (spec.lose.timeLimitSeconds !== undefined) timer = formatTime(spec.lose.timeLimitSeconds - secs);
-    this.hud.update(`${spec.score.label}: ${this.score}${target}`, this.lives, Math.max(spec.player.lives, this.lives), timer);
+    let timer: HudState['timer'];
+    if (spec.win.type === 'survive') timer = { label: 'Survive', seconds: spec.win.seconds - secs, urgent: false };
+    else if (spec.lose.timeLimitSeconds !== undefined) {
+      const left = spec.lose.timeLimitSeconds - secs;
+      timer = { label: 'Time', seconds: left, urgent: left <= 10 };
+    }
+    this.hud.update({
+      score: this.score,
+      target: spec.win.type === 'score' ? spec.win.target : undefined,
+      lives: this.lives,
+      maxLives: Math.max(spec.player.lives, this.lives),
+      timer,
+    });
   }
 }
