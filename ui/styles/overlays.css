@@ -390,3 +390,16 @@ button.asset-tile span:last-child { font-size: 10.5px; color: var(--text-3); fon
 .frame-cell img { width: 56px; height: 56px; object-fit: contain; }
 .frame-cell span { font-size: var(--fs-xs); color: var(--text-2); }
 .frame-remove { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; min-height: 0; padding: 0; font-size: 14px; }
+
+/* Level Editor */
+.level-tabs { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.level-tab { height: 30px; font-size: var(--fs-xs); }
+.level-tab[aria-selected='true'] { border-color: rgb(var(--accent-rgb) / 0.7); background: rgb(var(--accent-rgb) / 0.12); color: var(--text); }
+.level-actions { flex-wrap: wrap; justify-content: flex-start; }
+.level-actions input { flex: 1 1 160px; min-width: 0; }
+.level-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); }
+.level-toolbar .segmented { width: 240px; }
+.level-canvas { width: 100%; aspect-ratio: 960 / 496; border-radius: var(--r-md); border: 1px solid var(--border); cursor: crosshair; touch-action: none; }
+.level-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gen-panel { display: grid; gap: var(--s-3); }
+.seed-field { flex: 0 0 120px; }
