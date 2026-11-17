@@ -3,7 +3,9 @@ import type { GameSpec } from '../spec/schema';
 
 type SpriteDef = GameSpec['sprites'][string];
 
-export const texKey = (spriteId: string): string => `spr_${spriteId}`;
+/** Texture key for a sprite, or for one of its extra animation frames (1-based). */
+export const texKey = (spriteId: string, frame = 0): string => (frame ? `spr_${spriteId}#${frame}` : `spr_${spriteId}`);
+const frameId = (spriteId: string, frame: number) => (frame ? `${spriteId}#${frame}` : spriteId);
 
 function svgDataUrl(svg: string): string {
   const withNs = svg.includes('xmlns=') ? svg : svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -41,15 +43,17 @@ async function rasterize(def: SpriteDef, resolution: number): Promise<HTMLCanvas
  * display size to rasterise at, so sprites stay crisp when the game is rendered zoomed in.
  */
 export async function rasterizeSprites(sprites: GameSpec['sprites'], resolution = 2): Promise<Map<string, HTMLCanvasElement>> {
-  const entries = await Promise.all(
-    Object.entries(sprites).map(async ([id, def]) => [id, await rasterize(def, resolution)] as const),
+  const jobs = Object.entries(sprites).flatMap(([id, def]) =>
+    [def.svg, ...(def.frames ?? [])].map(async (svg, i) => [frameId(id, i), await rasterize({ ...def, svg }, resolution)] as const),
   );
+  const entries = await Promise.all(jobs);
   return new Map(entries);
 }
 
 export function registerTextures(scene: Phaser.Scene, canvases: Map<string, HTMLCanvasElement>): void {
   for (const [id, canvas] of canvases) {
-    if (!scene.textures.exists(texKey(id))) scene.textures.addCanvas(texKey(id), canvas);
+    const key = `spr_${id}`;
+    if (!scene.textures.exists(key)) scene.textures.addCanvas(key, canvas);
   }
 }
 

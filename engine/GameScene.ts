@@ -6,6 +6,7 @@ import { Music } from './music';
 import { keyLabel } from '../spec/controls';
 import type { GameStatus } from './status';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
+import { Animator } from './animate';
 import { atLedge, buildLevel, inWall, liftOutOfWalls, type Level } from './level';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, popScore, quoteBubble, showOverlay, toast, type HudState } from './ui';
@@ -46,6 +47,7 @@ export class GameScene extends Phaser.Scene {
   private readonly music: Music;
   private invulnerableUntil = 0;
   private level?: Level;
+  private animator!: Animator;
   private groundedAt = -Infinity;
   private jumpPressedAt = -Infinity;
   private jumpWasHeld = true;
@@ -95,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
 
     this.level = buildLevel(this, spec);
+    this.animator = new Animator(this);
 
     const def = spec.sprites[spec.player.sprite];
     let start = this.level?.start ?? { x: FIELD.x + spec.player.start.x * FIELD.w, y: FIELD.y + spec.player.start.y * FIELD.h };
@@ -103,6 +106,7 @@ export class GameScene extends Phaser.Scene {
     sizeSprite(this.player, def);
     this.player.setCollideWorldBounds(true).setDepth(10);
     if (this.platformer) this.player.body.setGravityY(this.gravity);
+    this.animator.attach(this.player, spec.player.sprite, def);
 
     this.entities = this.physics.add.group();
     this.physics.add.overlap(this.player, this.entities, (_p, e) => this.onTouch(e as Body));
@@ -174,10 +178,12 @@ export class GameScene extends Phaser.Scene {
     sizeSprite(sprite, def);
     this.state.set(sprite, { spec, mover: newMover(dir, spec.behavior), entered: false, cooldownUntil: 0 });
     if (this.walker(spec)) sprite.body.setGravityY(this.gravity);
+    this.animator.attach(sprite, spec.sprite, def);
   }
 
   update(_time: number, delta: number): void {
     this.controls.poll(); // gamepad buttons work on the start and end cards too
+    this.animator.update(this.time.now);
     if (this.phase !== 'playing') return;
     this.elapsedMs += delta;
     if (this.platformer) this.movePlatformer(delta);
