@@ -91,7 +91,7 @@ export const WinSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('survive'), seconds: z.number().int().min(5).max(600) }),
 ]);
 
-export const GameSpecSchema = z
+const GameSpecBase = z
   .object({
     version: z.literal(1),
     title: z.string().min(1).max(60),
@@ -120,31 +120,76 @@ export const GameSpecSchema = z
       win: z.string().max(160),
       lose: z.string().max(160),
     }),
-  })
-  .superRefine((spec, ctx) => {
-    const sprites = new Set(Object.keys(spec.sprites));
-    const entityIds = new Set<string>();
-    const issue = (path: PropertyKey[], message: string) => ctx.addIssue({ code: 'custom', path, message });
+  });
 
-    if (sprites.size > 16) issue(['sprites'], 'at most 16 sprites');
-    if (!sprites.has(spec.player.sprite)) {
-      issue(['player', 'sprite'], `unknown sprite "${spec.player.sprite}"`);
-    }
-    spec.entities.forEach((e, i) => {
-      if (entityIds.has(e.id)) issue(['entities', i, 'id'], `duplicate entity id "${e.id}"`);
-      entityIds.add(e.id);
-      if (!sprites.has(e.sprite)) issue(['entities', i, 'sprite'], `unknown sprite "${e.sprite}"`);
-    });
-    spec.spawns.forEach((s, i) => {
-      if (!entityIds.has(s.entity)) issue(['spawns', i, 'entity'], `unknown entity "${s.entity}"`);
-    });
-    if (spec.win.type === 'score' && !spec.entities.some((e) => e.onCollide.score > 0) && spec.score.perSecond === 0) {
-      issue(['win'], 'score win needs an entity with positive onCollide.score or score.perSecond > 0');
-    }
-    if (spec.win.type === 'survive' && spec.lose.timeLimitSeconds !== undefined) {
-      issue(['lose', 'timeLimitSeconds'], 'a survive win cannot also have a time limit');
+export const GameSpecSchema = GameSpecBase.superRefine((spec, ctx) => {
+  const sprites = new Set(Object.keys(spec.sprites));
+  const entityIds = new Set<string>();
+  const issue = (path: PropertyKey[], message: string) => ctx.addIssue({ code: 'custom', path, message });
+
+  if (sprites.size > 16) issue(['sprites'], 'at most 16 sprites');
+  if (!sprites.has(spec.player.sprite)) {
+    issue(['player', 'sprite'], `unknown sprite "${spec.player.sprite}"`);
+  }
+  spec.entities.forEach((e, i) => {
+    if (entityIds.has(e.id)) issue(['entities', i, 'id'], `duplicate entity id "${e.id}"`);
+    entityIds.add(e.id);
+    if (!sprites.has(e.sprite)) issue(['entities', i, 'sprite'], `unknown sprite "${e.sprite}"`);
+  });
+  spec.spawns.forEach((s, i) => {
+    if (!entityIds.has(s.entity)) issue(['spawns', i, 'entity'], `unknown entity "${s.entity}"`);
+  });
+  if (spec.win.type === 'score' && !spec.entities.some((e) => e.onCollide.score > 0) && spec.score.perSecond === 0) {
+    issue(['win'], 'score win needs an entity with positive onCollide.score or score.perSecond > 0');
+  }
+  if (spec.win.type === 'survive' && spec.lose.timeLimitSeconds !== undefined) {
+    issue(['lose', 'timeLimitSeconds'], 'a survive win cannot also have a time limit');
+  }
+  checkBalance(spec, issue);
+});
+
+/** Chasing hazards faster than this share of the player's speed cannot be escaped. */
+export const MAX_CHASER_SPEED_RATIO = 0.75;
+/** With a time limit, the score target may be at most this share of the most points that can spawn. */
+export const MAX_TARGET_SHARE = 0.6;
+
+type Issue = (path: PropertyKey[], message: string) => void;
+type ParsedSpec = z.output<typeof GameSpecBase>;
+
+/** Points that could possibly be collected within `seconds`, if the player caught every reward. */
+export function maxReachableScore(spec: ParsedSpec, seconds: number): number {
+  let total = spec.score.perSecond * seconds;
+  for (const rule of spec.spawns) {
+    const points = spec.entities.find((e) => e.id === rule.entity)?.onCollide.score ?? 0;
+    const activeMs = seconds * 1000 - rule.startDelayMs;
+    if (points > 0 && activeMs > 0) total += points * (Math.floor(activeMs / rule.everyMs) + 1);
+  }
+  return total;
+}
+
+function checkBalance(spec: ParsedSpec, issue: Issue): void {
+  const maxChaser = Math.floor(spec.player.speed * MAX_CHASER_SPEED_RATIO);
+  spec.entities.forEach((e, i) => {
+    if (e.behavior === 'chase' && e.onCollide.lives < 0 && e.speed > maxChaser) {
+      issue(
+        ['entities', i, 'speed'],
+        `chasing hazard is too fast to escape: speed ${e.speed} must be at most ${maxChaser} (75% of player.speed ${spec.player.speed})`,
+      );
     }
   });
+  const limit = spec.lose.timeLimitSeconds;
+  if (spec.win.type === 'score' && limit !== undefined) {
+    const reachable = maxReachableScore(spec, limit);
+    const allowed = Math.floor(reachable * MAX_TARGET_SHARE);
+    if (spec.win.target > allowed) {
+      issue(
+        ['win', 'target'],
+        `target ${spec.win.target} is not realistically reachable in ${limit}s: at most ${reachable} points can spawn, ` +
+          `so use a target of at most ${allowed}, or spawn rewards more often, or raise the time limit`,
+      );
+    }
+  }
+}
 
 /** Spec as authored / produced by the LLM (defaults optional). */
 export type GameSpecInput = z.input<typeof GameSpecSchema>;

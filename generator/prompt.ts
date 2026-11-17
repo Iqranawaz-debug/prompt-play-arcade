@@ -17,12 +17,30 @@ How the engine works:
 Rules:
 - "version" is always 1. Ids are lowercase snake_case. Colours are "#rrggbb".
 - Every sprite referenced by player/entities must exist in "sprites"; every spawn.entity must exist in "entities".
-- Sprites are compact inline SVG: include xmlns="http://www.w3.org/2000/svg" and a viewBox, use simple flat shapes,
-  no <text>, no <script>, no event handlers, no images or external hrefs. Keep each SVG under 2000 characters.
-  Make sprites readable at small sizes, with colours that contrast with theme.background.
-- Set "faces" to "left" or "right" for sprites drawn facing a direction (fish, cars), otherwise "none".
-- Balance the game: the win must be reachable, rewards should be common, hazards less common. Use 2-6 entities.
 - Give entities personality through names and short quotes that fit the user's idea.
+- Set "faces" to "left" or "right" for sprites drawn facing a direction (fish, cars), otherwise "none".
+
+Sprites (inline SVG, shown at only 24-64 px, so they must read instantly):
+- Include xmlns="http://www.w3.org/2000/svg" and a viewBox with the same aspect ratio as width/height.
+  Keep every shape inside the viewBox. No <text>, <script>, event handlers, images or external hrefs. Under 2000 characters.
+- Before drawing, decide the ONE feature that makes the thing recognisable (a hedgehog's spikes, a beetle's legs and
+  shell line, a mushroom's cap and stem, a fish's tail fin) and make it big and obvious. Exaggerate like a sticker.
+- Use 4-12 simple primitives (circle, ellipse, rect with rx, polygon, short paths). Draw spikes, legs and petals as
+  separate polygons or thick round-capped strokes (stroke-width 2-4), never as one thin zig-zag.
+- Paint back to front: glow/shadow, then legs/spikes/tail, then body, then details, then eyes LAST. Anything drawn
+  later covers what came before, so never draw a body over the eyes.
+- Contrast: every sprite's main colour must stand out clearly from theme.background (bright, saturated colours on dark
+  backgrounds, deep colours on light ones). Give the body a darker outline stroke (stroke-width 1.5-2.5) so it never
+  blends in. Avoid greys and browns that are close to the background's brightness.
+- Creatures get eyes: a white circle with a dark pupil. Make the player the most distinctive sprite (40-64 px).
+  Rewards should look appealing (bright, warm), hazards should look dangerous (spikes, angry eyes, red or purple).
+- "Glowing" things: put a larger circle or ellipse behind them in a light colour with fill-opacity 0.25-0.4.
+
+Balance (the validator enforces the first two):
+- A chasing hazard (behavior "chase" with negative lives) must have speed at most 75% of player.speed.
+- With a score win and a time limit, the target must be at most 60% of the points that can spawn in that time.
+- Rewards should spawn more often than hazards. Hazards start after a short startDelayMs so the player can settle in.
+  Use 2-6 entities.
 
 JSON Schema:
 ${jsonSchema}
