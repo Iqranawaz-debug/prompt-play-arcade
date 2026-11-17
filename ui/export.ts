@@ -16,3 +16,9 @@ export async function exportGame(spec: GameSpec): Promise<void> {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** The standalone game as a File, for the system share sheet. */
+export async function gameFile(spec: GameSpec): Promise<File> {
+  const html = buildGameHtml(spec, await loadEngineSource());
+  return new File([html], fileNameFor(spec.title), { type: 'text/html' });
+}

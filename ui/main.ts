@@ -6,6 +6,8 @@ import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, enhancePrompt, fetchHealth, generateGame } from './api';
 import { addGame, addVersion, currentVersionOf, deleteGame, listGames, markPlayed, restoreVersion, seedIfEmpty, setFavorite, type SavedGame } from './db';
 import { createHistoryPanel } from './history';
+import { decodeSpec, sharedFromHash } from './share';
+import { createShareDialog } from './shareDialog';
 import { createGameOptions } from './gameOptions';
 import { GENRES } from './genre';
 import { SORTS, filterCounts, queryGames, type LibraryFilter, type LibraryQuery, type LibrarySort } from './libraryQuery';
@@ -39,6 +41,10 @@ const stageTitle = $('stage-title');
 const stageError = $('stage-error');
 const restartBtn = $<HTMLButtonElement>('restart');
 const historyBtn = $<HTMLButtonElement>('history');
+const shareBtn = $<HTMLButtonElement>('share');
+const sharedBanner = $('shared-banner');
+/** A game opened from a share link that is not (yet) in the library. */
+let sharedSpec: GameSpec | undefined;
 const fullscreenBtn = $<HTMLButtonElement>('fullscreen');
 const promptCounter = $('prompt-counter');
 const libraryCount = $('library-count');
@@ -118,6 +124,8 @@ const player = new GamePlayer(
 function syncStageButtons(): void {
   restartBtn.disabled = !player.loaded;
   historyBtn.disabled = !player.loaded || !activeId;
+  shareBtn.disabled = !player.loaded;
+  sharedBanner.hidden = !sharedSpec || !player.loaded;
   const versions = allGames.find((g) => g.id === activeId)?.versions?.length ?? 0;
   setButtonLabel(historyBtn, versions > 1 ? `History · ${versions}` : 'History');
   fullscreenBtn.disabled = !player.loaded || !document.fullscreenEnabled;
@@ -284,6 +292,7 @@ librarySort.addEventListener('change', () => setLibQuery({ sort: librarySort.val
 
 async function play(game: SavedGame): Promise<void> {
   activeId = game.id;
+  sharedSpec = undefined;
   setStageInfo(game);
   showStageError();
   await markPlayed(game.id);
@@ -514,6 +523,10 @@ function commands(): Command[] {
       hint: current?.versions && current.versions.length > 1 ? `${current.versions.length} versions` : undefined,
       disabled: !current, run: () => current && historyPanel.open(current),
     },
+    {
+      id: 'share', group: 'Current game', title: 'Share this game', hint: 'Link or file', keywords: 'link send copy portfolio export',
+      disabled: !player.loaded, run: () => shareBtn.click(),
+    },
     { id: 'restart', group: 'Current game', title: 'Restart game', keywords: 'reload again replay', disabled: !player.loaded, run: () => restartBtn.click() },
     { id: 'fullscreen', group: 'Current game', title: 'Toggle fullscreen', keywords: 'full screen expand', disabled: !player.loaded, run: () => fullscreenBtn.click() },
     ...allGames.map<Command>((g) => ({
@@ -533,6 +546,53 @@ const historyPanel = createHistoryPanel($('overlays'), async (game, n) => {
   notify('success', `Restored version ${n}`, `"${restored.title}" is back to version ${n}.`);
   await play(restored);
 });
+// ---------- Sharing ----------
+const shareDialog = createShareDialog($('overlays'));
+const currentSpec = () => sharedSpec ?? allGames.find((g) => g.id === activeId)?.spec;
+shareBtn.addEventListener('click', () => {
+  const spec = currentSpec();
+  if (spec) void shareDialog.open(spec);
+});
+
+/** Play a game from a share link without adding it to the library. */
+async function playShared(spec: GameSpec): Promise<void> {
+  activeId = undefined;
+  sharedSpec = spec;
+  setStageInfo({ title: spec.title, spec });
+  showStageError();
+  renderLibraryView();
+  try {
+    lastScore = 0;
+    await player.play(spec);
+    showGameStatus('loading');
+  } catch (err) {
+    showStageError((err as Error).message);
+  }
+  syncStageButtons();
+}
+
+async function openSharedFromHash(): Promise<void> {
+  const encoded = sharedFromHash();
+  if (!encoded) return;
+  try {
+    const spec = await decodeSpec(encoded);
+    await playShared(spec);
+    notify('info', 'Shared game opened', `"${spec.title}" is playing. Save it to keep it.`);
+  } catch (err) {
+    showStageError((err as Error).message);
+    notify('error', 'Could not open shared game', (err as Error).message);
+  }
+}
+window.addEventListener('hashchange', () => void openSharedFromHash());
+
+$('save-shared').addEventListener('click', async () => {
+  if (!sharedSpec) return;
+  const game = await addGame(`Shared game: ${sharedSpec.title}`, sharedSpec);
+  history.replaceState(null, '', location.pathname + location.search);
+  notify('success', 'Saved to library', `"${game.title}" is now in your library.`);
+  await play(game);
+});
+
 historyBtn.addEventListener('click', () => {
   const game = allGames.find((g) => g.id === activeId);
   if (game) historyPanel.open(game);
@@ -568,6 +628,7 @@ async function init(): Promise<void> {
   updateCounter();
   await seedIfEmpty();
   await refreshLibrary();
+  await openSharedFromHash();
   const health = await fetchHealth();
   if (health?.label) modelName = health.label;
   modelChip.textContent = !health ? 'Server offline' : (health.label ?? 'No API key');
