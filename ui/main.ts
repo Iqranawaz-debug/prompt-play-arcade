@@ -510,6 +510,7 @@ onSettings(({ keys }) => {
   const kbd = (code: string) => `<kbd>${keyLabel(code).replace(/[<>&]/g, '')}</kbd>`;
   $('stage-hint').innerHTML =
     `<span>${kbd(keys.left[0])} ${kbd(keys.right[0])} or drag to move</span>` +
+    `<span>${kbd(keys.up[0])} jump in platformers</span>` +
     `<span>${kbd(keys.start[0])} to start</span><span>${kbd(keys.sound[0])} sound</span>`;
 });
 createNotificationCenter($<HTMLButtonElement>('open-notifications'), $('notif-count'), $('notif-panel'), $('toasts'));
