@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { providerFromEnv } from './config';
-import { ProviderError, geminiProvider, modelLabel, openAiCompatibleProvider, withFallback, type ChatProvider } from './providers';
+import { ProviderError, errorDetail, geminiProvider, modelLabel, openAiCompatibleProvider, withFallback, type ChatProvider } from './providers';
 
 const msgs = [
   { role: 'system' as const, content: 'sys' },
@@ -82,5 +82,14 @@ describe('modelLabel', () => {
     expect(providerFromEnv({ LLM_API_KEY: 'a', FALLBACK_API_KEY: 'b' })!.label).toBe(
       'Gemini 2.5 Flash (fallback: Llama 3.3 70B Versatile)',
     );
+  });
+});
+
+describe('errorDetail', () => {
+  it('extracts the message from Gemini and OpenAI-style error bodies', () => {
+    const gemini = JSON.stringify({ error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } });
+    expect(errorDetail(gemini)).toBe('This model is currently experiencing high demand.');
+    expect(errorDetail(JSON.stringify({ error: 'rate limited' }))).toBe('rate limited');
+    expect(errorDetail('<html>  Bad   Gateway </html>')).toBe('<html> Bad Gateway </html>');
   });
 });

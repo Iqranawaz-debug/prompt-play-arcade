@@ -25,6 +25,8 @@ export class ProviderError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** The provider's own explanation, extracted from its error body when possible. */
+    readonly detail?: string,
   ) {
     super(message);
     this.name = 'ProviderError';
@@ -44,6 +46,21 @@ export function modelLabel(model: string): string {
     .filter(Boolean)
     .map((w) => known[w.toLowerCase()] ?? (/^\d+(\.\d+)?[bm]$/i.test(w) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
     .join(' ');
+}
+
+/** HTTP statuses that mean "try again shortly" rather than "this request is wrong". */
+export const isTransientStatus = (status?: number): boolean => status === 429 || (status !== undefined && status >= 500);
+
+/** Pull the human-readable message out of a provider error body (Gemini and OpenAI-style JSON). */
+export function errorDetail(body: string): string {
+  try {
+    const json = JSON.parse(body) as { error?: { message?: string } | string; message?: string };
+    const message = typeof json.error === 'string' ? json.error : (json.error?.message ?? json.message);
+    if (message) return message.trim().slice(0, 300);
+  } catch {
+    // not JSON: fall through to the raw text
+  }
+  return body.trim().replace(/\s+/g, ' ').slice(0, 300);
 }
 
 async function postJson(
@@ -67,8 +84,8 @@ async function postJson(
     throw new ProviderError(`${label}: request failed (${err instanceof Error ? err.message : String(err)})`);
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    throw new ProviderError(`${label}: HTTP ${res.status} ${detail}`, res.status);
+    const detail = errorDetail(await res.text().catch(() => ''));
+    throw new ProviderError(`${label}: HTTP ${res.status}${detail ? `: ${detail}` : ''}`, res.status, detail);
   }
   return res.json();
 }

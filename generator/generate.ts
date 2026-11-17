@@ -1,6 +1,6 @@
 import { GameSpecSchema, formatIssues, type GameSpec } from '../spec/schema';
 import { SYSTEM_PROMPT, remixPrompt, retryPrompt, userPrompt } from './prompt';
-import type { ChatMessage, ChatProvider } from './providers';
+import { ProviderError, isTransientStatus, type ChatMessage, type ChatProvider } from './providers';
 
 export const MAX_RETRIES = 2;
 
@@ -45,19 +45,55 @@ function check(reply: string): Check {
 export type GenerateProgress =
   | { phase: 'generating'; attempt: number }
   | { phase: 'validating'; attempt: number }
-  | { phase: 'retrying'; attempt: number; retry: number; maxRetries: number; problems: number };
+  | { phase: 'retrying'; attempt: number; retry: number; maxRetries: number; problems: number }
+  | { phase: 'busy'; attempt: number; wait: number; maxWaits: number; delayMs: number; status?: number };
 
 /** One line of the NDJSON stream that POST /api/generate sends back. */
 export type GenerateEvent =
   | ({ type: 'status' } & GenerateProgress)
   | { type: 'done'; spec: GameSpec; attempts: number }
-  | { type: 'error'; message: string };
+  | { type: 'error'; title: string; message: string };
+
+/** How long to wait before re-asking a busy model (HTTP 429/5xx). One entry per extra try. */
+export const BUSY_DELAYS_MS = [2000, 5000];
 
 export interface GenerateOptions {
   maxRetries?: number;
   onProgress?: (progress: GenerateProgress) => void;
   /** Aborts the in-flight model request (e.g. when the user cancels). */
   signal?: AbortSignal;
+  /** Override the busy back-off (tests use zeros). */
+  busyDelaysMs?: number[];
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => (clearTimeout(timer), reject(signal.reason)), { once: true });
+  });
+}
+
+/** Call the model, waiting and trying again while it reports being overloaded. */
+async function completeWithBackoff(
+  provider: ChatProvider,
+  messages: ChatMessage[],
+  attempt: number,
+  { onProgress, signal, busyDelaysMs = BUSY_DELAYS_MS }: GenerateOptions,
+): Promise<string> {
+  for (let wait = 0; ; wait++) {
+    try {
+      return await provider.complete(messages, signal);
+    } catch (err) {
+      const transient = err instanceof ProviderError && isTransientStatus(err.status);
+      if (signal?.aborted || !transient || wait >= busyDelaysMs.length) throw err;
+      const delayMs = busyDelaysMs[wait];
+      console.warn(`[generate] model busy (HTTP ${err.status}), retrying in ${delayMs}ms`);
+      onProgress?.({ phase: 'busy', attempt, wait: wait + 1, maxWaits: busyDelaysMs.length, delayMs, status: err.status });
+      await sleep(delayMs, signal);
+      onProgress?.({ phase: 'generating', attempt });
+    }
+  }
 }
 
 /**
@@ -67,8 +103,9 @@ export interface GenerateOptions {
 export async function generateSpec(
   provider: ChatProvider,
   firstUserMessage: string,
-  { maxRetries = MAX_RETRIES, onProgress, signal }: GenerateOptions = {},
+  options: GenerateOptions = {},
 ): Promise<GenerateResult> {
+  const { maxRetries = MAX_RETRIES, onProgress } = options;
   const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: firstUserMessage },
@@ -76,7 +113,7 @@ export async function generateSpec(
   let problems = '';
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     if (attempt === 1) onProgress?.({ phase: 'generating', attempt });
-    const reply = await provider.complete(messages, signal);
+    const reply = await completeWithBackoff(provider, messages, attempt, options);
     onProgress?.({ phase: 'validating', attempt });
     const result = check(reply);
     if (result.ok) return { spec: result.spec, attempts: attempt };

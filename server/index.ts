@@ -4,7 +4,8 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { GameSpecSchema } from '../spec/schema';
 import { providerFromEnv } from '../generator/config';
-import { generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
+import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
+import { ProviderError, isTransientStatus } from '../generator/providers';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -58,12 +59,36 @@ app.post('/api/generate', async (req, res) => {
   } catch (err) {
     if (!cancel.signal.aborted) {
       console.error('[generate] failed:', (err as Error).message);
-      send({ type: 'error', message: (err as Error).message });
+      send({ type: 'error', ...describeFailure(err, provider.label) });
     }
   } finally {
     res.end();
   }
 });
+
+/** Turn a failure into a title and message a person can act on. */
+function describeFailure(err: unknown, model: string): { title: string; message: string } {
+  if (err instanceof ProviderError) {
+    if (isTransientStatus(err.status)) {
+      return {
+        title: `${model} is busy right now`,
+        message:
+          `The model is overloaded (HTTP ${err.status}) and still was after a few automatic retries. ` +
+          'This usually clears within a minute, so try again shortly. To switch models automatically next time, ' +
+          'set FALLBACK_API_KEY in .env.' +
+          (err.detail ? `\n\nProvider said: ${err.detail}` : ''),
+      };
+    }
+    if (err.status === 401 || err.status === 403) {
+      return { title: 'API key rejected', message: `Check LLM_API_KEY in .env (HTTP ${err.status}).${err.detail ? `\n\n${err.detail}` : ''}` };
+    }
+    return { title: 'The model request failed', message: err.detail ?? err.message };
+  }
+  if (err instanceof GenerationError) {
+    return { title: 'The model could not produce a valid game', message: err.message };
+  }
+  return { title: 'Generation failed', message: (err as Error).message };
+}
 
 // Serve the built UI in production (`npm run build && npm start`).
 const dist = resolve('dist');

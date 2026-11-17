@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { cometCourier } from '../spec/examples/cometCourier';
 import { GameSpecSchema } from '../spec/schema';
 import { GenerationError, extractJson, generateSpec } from './generate';
 import { SYSTEM_PROMPT } from './prompt';
-import type { ChatMessage, ChatProvider } from './providers';
+import { ProviderError, type ChatMessage, type ChatProvider } from './providers';
 
 /** Provider that replays canned replies and records what it was sent. */
 function fakeProvider(replies: string[]) {
@@ -105,5 +105,39 @@ describe('progress and cancellation', () => {
     const controller = new AbortController();
     await generateSpec(provider, 'x', { signal: controller.signal });
     expect(seen).toBe(controller.signal);
+  });
+});
+
+describe('busy model back-off', () => {
+  const busyThen = (failures: number, status = 503): ChatProvider => {
+    let calls = 0;
+    return {
+      name: 'busy',
+      label: 'Busy',
+      complete: async () => {
+        if (calls++ < failures) throw new ProviderError('busy', status, 'high demand');
+        return valid;
+      },
+    };
+  };
+
+  it('waits and retries while the model reports 429/5xx, reporting each wait', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const events: unknown[] = [];
+    const result = await generateSpec(busyThen(2), 'x', { busyDelaysMs: [0, 0], onProgress: (p) => events.push(p) });
+    expect(result.attempts).toBe(1);
+    expect(events.filter((e) => (e as { phase: string }).phase === 'busy')).toEqual([
+      { phase: 'busy', attempt: 1, wait: 1, maxWaits: 2, delayMs: 0, status: 503 },
+      { phase: 'busy', attempt: 1, wait: 2, maxWaits: 2, delayMs: 0, status: 503 },
+    ]);
+  });
+
+  it('gives up after the configured waits', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(generateSpec(busyThen(3), 'x', { busyDelaysMs: [0, 0] })).rejects.toBeInstanceOf(ProviderError);
+  });
+
+  it('does not retry errors that will not go away (e.g. a bad key)', async () => {
+    await expect(generateSpec(busyThen(1, 401), 'x', { busyDelaysMs: [0, 0] })).rejects.toMatchObject({ status: 401 });
   });
 });
