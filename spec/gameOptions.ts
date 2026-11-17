@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 /**
  * Choices made before generating a game. Shared by the UI (form), the server (validation) and the prompt.
- * Genres are limited to what the engine can deliver: it makes arcade-style games (move, collect, dodge, chase, survive).
+ * Genres are limited to what the engine can deliver: arcade-style games (move, collect, dodge, chase, survive) and
+ * simple platformers (run and jump on a tile map).
  */
 export const GENRES = [
   { id: 'arcade', name: 'Arcade', hint: 'Fast reflex scoring' },
@@ -10,6 +11,7 @@ export const GENRES = [
   { id: 'survival', name: 'Survival', hint: 'Last until the clock runs out' },
   { id: 'chase', name: 'Chase', hint: 'Outrun things that hunt you' },
   { id: 'adventure', name: 'Adventure', hint: 'Explore a calm world and discover things' },
+  { id: 'platformer', name: 'Platformer', hint: 'Run and jump across ledges' },
 ] as const;
 
 export const DIFFICULTIES = [
@@ -58,6 +60,9 @@ const GENRE_BRIEF: Record<Genre, string> = {
   survival: 'Survival: use a "survive" win condition; hazards ramp up over time.',
   chase: 'Chase: include at least one hazard with the "chase" behavior that the player must outrun.',
   adventure: 'Adventure: a calm world to explore with wandering or static discoveries and few hazards.',
+  platformer:
+    'Platformer: player.controls "platformer" with physics (gravity and jump) and a level map of ledges; ' +
+    'rewards on "platforms" spawns, "patrol" hazards walking the ledges.',
 };
 
 /** Extra lines for the model describing the player's chosen settings. */

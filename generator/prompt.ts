@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
+import { lanternHop } from '../spec/examples/lanternHop';
+import { DEFAULT_TILE, maxCols, maxRows } from '../spec/level';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
 
 export const jsonSchema = JSON.stringify(z.toJSONSchema(GameSpecSchema, { io: 'input', unrepresentable: 'any' }));
@@ -33,10 +35,20 @@ export const SYSTEM_PROMPT = `You design small, fun 2D arcade games for a fixed 
 You never write code. You reply with ONE JSON object that matches the JSON Schema below, and nothing else.
 
 How the engine works:
-- The screen is 800x600 pixels. The player sprite moves with arrow keys/WASD or by dragging.
+- The play field is 960x496 pixels (below a HUD bar). The player sprite moves with arrow keys/WASD or by dragging.
 - Entities spawn from screen edges on timers (spawns[]) and move by "behavior".
 - When the player touches an entity, onCollide applies: score change, lives change, optional destroy, and one of its quotes pops up.
 - The game is lost when lives reach 0 (or the optional time limit runs out). It is won by reaching a score target or surviving N seconds.
+- Sprites may set "anim" for a little life: idle "bob"/"pulse"/"sway"/"wobble"/"spin", move "tilt"/"squash"/"bob".
+
+Platformers (only when the idea is about running and jumping, or the genre asks for it):
+- Set player.controls to "platformer" and "physics" with gravity 1000-1600 and a jump that reaches at least 1.5 tiles
+  (jump height = jump^2 / (2*gravity)); jump 600-750 works well with gravity 1400. friction 0-0.5.
+- Add a "level": tileSize ${DEFAULT_TILE} gives ${maxCols(DEFAULT_TILE)} columns x ${maxRows(DEFAULT_TILE)} rows. Each map row is a string, "#" = solid
+  ground/ledge, "." = empty, one "P" = player start. The bottom of the field is always solid, but a full "#" bottom row
+  looks good. Space ledges 2 rows apart vertically and at most 3 tiles apart horizontally so every ledge is reachable.
+- Rewards use spawn edge "platforms" (they appear standing on ledges) with behavior "static".
+  Hazards that walk the ledges use behavior "patrol" with speed 50-110. Flying hazards can still use other behaviors.
 
 Rules:
 - "version" is always 1. Ids are lowercase snake_case. Colours are "#rrggbb".
@@ -60,7 +72,10 @@ Example 1:
 ${JSON.stringify(philosopherFishing)}
 
 Example 2:
-${JSON.stringify(cometCourier)}`;
+${JSON.stringify(cometCourier)}
+
+Example 3:
+${JSON.stringify(lanternHop)}`;
 
 export function userPrompt(idea: string, options?: GameOptions): string {
   const settings = options ? `\n\n${optionsBrief(options)}` : '';

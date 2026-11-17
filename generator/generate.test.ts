@@ -59,10 +59,10 @@ describe('generateSpec', () => {
 });
 
 describe('system prompt', () => {
-  it('embeds the schema and two valid examples', () => {
+  it('embeds the schema and three valid examples', () => {
     expect(SYSTEM_PROMPT).toContain('"$schema"');
     const examples = SYSTEM_PROMPT.split(/Example \d:\n/).slice(1);
-    expect(examples).toHaveLength(2);
+    expect(examples).toHaveLength(3);
     for (const ex of examples) expect(GameSpecSchema.safeParse(JSON.parse(ex)).success).toBe(true);
   });
 });
