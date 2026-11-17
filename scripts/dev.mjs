@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 
 const procs = [
+  ['engine', 'npm run dev:engine'],
   ['web', 'npm run dev:web'],
   ['api', 'npm run dev:server'],
 ].map(([name, cmd]) => {

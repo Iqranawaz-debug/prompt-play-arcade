@@ -4,13 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Game Generator</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #111; }
-      #game { width: 100vw; height: 100vh; }
-    </style>
   </head>
   <body>
-    <div id="game"></div>
+    <header>
+      <h1>Game Generator</h1>
+      <span id="provider-status" class="pill">Checking server…</span>
+    </header>
+    <main>
+      <section class="panel">
+        <form id="gen-form">
+          <label for="prompt">Describe a game</label>
+          <textarea
+            id="prompt"
+            rows="4"
+            maxlength="2000"
+            placeholder="A cozy fishing game where the fish are tiny philosophers"
+          ></textarea>
+          <div class="row">
+            <button id="generate" type="submit" class="primary">Generate</button>
+            <span id="gen-status" role="status" aria-live="polite"></span>
+          </div>
+          <p id="gen-error" class="error" role="alert" hidden></p>
+        </form>
+        <h2>Library</h2>
+        <ul id="library" class="library"></ul>
+      </section>
+      <section class="stage">
+        <h2 id="stage-title">No game selected</h2>
+        <div id="stage-frame" class="frame">
+          <p class="placeholder">Pick a game from the library, or generate a new one.</p>
+        </div>
+        <p id="stage-error" class="error" role="alert" hidden></p>
+      </section>
+    </main>
     <script type="module" src="/ui/main.ts"></script>
   </body>
 </html>

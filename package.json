@@ -7,12 +7,15 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && npm run build:engine && vite build",
     "start": "tsx server/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:engine": "vite build -c vite.engine.config.ts",
+    "dev:engine": "vite build -c vite.engine.config.ts --watch"
   },
   "dependencies": {
+    "dexie": "^4.4.7",
     "express": "^5.3.0",
     "phaser": "^3.90.0",
     "zod": "^4.6.7"
