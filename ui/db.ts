@@ -31,7 +31,12 @@ export interface SavedGame {
   /** Settings chosen when it was generated. */
   options?: GameOptions;
   versions?: GameVersion[];
+  /** Which version is current (defaults to the newest). */
+  currentVersion?: number;
 }
+
+/** The version number that is current for a game. */
+export const currentVersionOf = (g: SavedGame): number => g.currentVersion ?? Math.max(1, ...(g.versions ?? []).map((v) => v.n));
 
 /** One finished round, for personal stats. */
 export interface PlayRecord {
@@ -110,7 +115,7 @@ export async function addVersion(id: string, spec: GameSpec, note: string): Prom
   if (!game) return undefined;
   const versions = game.versions ?? [{ n: 1, spec: game.spec, note: 'Original', createdAt: game.createdAt }];
   const n = Math.max(...versions.map((v) => v.n)) + 1;
-  const next: Partial<SavedGame> = { spec, title: spec.title, updatedAt: Date.now(), versions: [...versions, { n, spec, note, createdAt: Date.now() }] };
+  const next: Partial<SavedGame> = { spec, title: spec.title, updatedAt: Date.now(), currentVersion: n, versions: [...versions, { n, spec, note, createdAt: Date.now() }] };
   await db.games.update(id, next);
   return { ...game, ...next } as SavedGame;
 }
@@ -120,7 +125,7 @@ export async function restoreVersion(id: string, n: number): Promise<SavedGame |
   const game = await db.games.get(id);
   const version = game?.versions?.find((v) => v.n === n);
   if (!game || !version) return undefined;
-  const next: Partial<SavedGame> = { spec: version.spec, title: version.spec.title, updatedAt: Date.now() };
+  const next: Partial<SavedGame> = { spec: version.spec, title: version.spec.title, updatedAt: Date.now(), currentVersion: n };
   await db.games.update(id, next);
   return { ...game, ...next } as SavedGame;
 }

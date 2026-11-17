@@ -4,7 +4,8 @@ import './styles/components.css';
 import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, enhancePrompt, fetchHealth, generateGame } from './api';
-import { addGame, deleteGame, listGames, markPlayed, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { addGame, addVersion, currentVersionOf, deleteGame, listGames, markPlayed, restoreVersion, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { createHistoryPanel } from './history';
 import { createGameOptions } from './gameOptions';
 import { GENRES } from './genre';
 import { SORTS, filterCounts, queryGames, type LibraryFilter, type LibraryQuery, type LibrarySort } from './libraryQuery';
@@ -37,6 +38,7 @@ const libraryList = $('library');
 const stageTitle = $('stage-title');
 const stageError = $('stage-error');
 const restartBtn = $<HTMLButtonElement>('restart');
+const historyBtn = $<HTMLButtonElement>('history');
 const fullscreenBtn = $<HTMLButtonElement>('fullscreen');
 const promptCounter = $('prompt-counter');
 const libraryCount = $('library-count');
@@ -115,6 +117,9 @@ const player = new GamePlayer(
 /** Keep the preview chrome in step with the player: buttons, empty state, glow and heading. */
 function syncStageButtons(): void {
   restartBtn.disabled = !player.loaded;
+  historyBtn.disabled = !player.loaded || !activeId;
+  const versions = allGames.find((g) => g.id === activeId)?.versions?.length ?? 0;
+  setButtonLabel(historyBtn, versions > 1 ? `History · ${versions}` : 'History');
   fullscreenBtn.disabled = !player.loaded || !document.fullscreenEnabled;
   setButtonLabel(fullscreenBtn, player.isFullscreen ? 'Exit fullscreen' : 'Fullscreen');
   stageEmpty.hidden = player.loaded;
@@ -376,11 +381,20 @@ form.addEventListener('submit', async (e) => {
         status.set(phase, detail, progressFor(p));
       },
     });
-    const game = base
-      ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, { remixOf: base.id })
-      : await addGame(prompt, spec, { options: chosen });
-    genNote.textContent = `Created "${spec.title}"${attempts > 1 ? ` after ${attempts} attempts` : ''}.`;
-    notify('success', base ? 'Remix ready' : 'Game generated successfully', `"${spec.title}" is ready to play.`);
+    // A remix becomes the next version of the same game (or a new game if the original was deleted meanwhile).
+    const versioned = base ? await addVersion(base.id, spec, prompt) : undefined;
+    const game =
+      versioned ??
+      (base ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, { remixOf: base.id }) : await addGame(prompt, spec, { options: chosen }));
+    const tries = attempts > 1 ? ` after ${attempts} attempts` : '';
+    if (versioned) {
+      const n = currentVersionOf(versioned);
+      genNote.textContent = `Saved version ${n} of "${spec.title}"${tries}.`;
+      notify('success', `Version ${n} saved`, `"${spec.title}": ${prompt}`);
+    } else {
+      genNote.textContent = `Created "${spec.title}"${tries}.`;
+      notify('success', base ? 'Remix ready' : 'Game generated successfully', `"${spec.title}" is ready to play.`);
+    }
     promptBox.value = '';
     updateCounter();
     setRemixTarget(undefined);
@@ -495,6 +509,11 @@ function commands(): Command[] {
       run: () => updateSettings({ motion: motionReduced() ? 'full' : 'reduced' }),
     },
     { id: 'export', group: 'Current game', title: current ? `Export "${current.title}"` : 'Export game', hint: '.html', keywords: 'download save file', disabled: !current, run: () => current && exportHtml(current) },
+    {
+      id: 'history', group: 'Current game', title: current ? `Version history of "${current.title}"` : 'Version history', keywords: 'versions restore undo previous remix',
+      hint: current?.versions && current.versions.length > 1 ? `${current.versions.length} versions` : undefined,
+      disabled: !current, run: () => current && historyPanel.open(current),
+    },
     { id: 'restart', group: 'Current game', title: 'Restart game', keywords: 'reload again replay', disabled: !player.loaded, run: () => restartBtn.click() },
     { id: 'fullscreen', group: 'Current game', title: 'Toggle fullscreen', keywords: 'full screen expand', disabled: !player.loaded, run: () => fullscreenBtn.click() },
     ...allGames.map<Command>((g) => ({
@@ -506,6 +525,18 @@ function commands(): Command[] {
 }
 
 const palette = createCommandPalette($('overlays'), commands);
+
+// ---------- Version history ----------
+const historyPanel = createHistoryPanel($('overlays'), async (game, n) => {
+  const restored = await restoreVersion(game.id, n);
+  if (!restored) return;
+  notify('success', `Restored version ${n}`, `"${restored.title}" is back to version ${n}.`);
+  await play(restored);
+});
+historyBtn.addEventListener('click', () => {
+  const game = allGames.find((g) => g.id === activeId);
+  if (game) historyPanel.open(game);
+});
 $('open-palette').addEventListener('click', () => palette.open());
 const settingsDrawer = createSettingsDrawer($('overlays'));
 $('open-settings').addEventListener('click', () => settingsDrawer.open());
