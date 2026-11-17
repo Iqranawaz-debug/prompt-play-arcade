@@ -10,6 +10,7 @@ export interface PlayerCallbacks {
 /** Hosts games in a sandboxed iframe: scripts only, opaque origin, no access to this app. */
 export class GamePlayer {
   private frame?: HTMLIFrameElement;
+  private spec?: GameSpec;
 
   constructor(
     private readonly host: HTMLElement,
@@ -23,6 +24,10 @@ export class GamePlayer {
     });
   }
 
+  get loaded(): boolean {
+    return this.spec !== undefined;
+  }
+
   async play(spec: GameSpec): Promise<void> {
     const html = buildGameHtml(spec, await loadEngineSource());
     this.stop();
@@ -34,10 +39,27 @@ export class GamePlayer {
     frame.addEventListener('load', () => frame.focus());
     this.host.replaceChildren(frame);
     this.frame = frame;
+    this.spec = spec;
+  }
+
+  /** Start the current game from scratch by rebuilding its frame. */
+  async restart(): Promise<void> {
+    if (this.spec) await this.play(this.spec);
   }
 
   stop(): void {
     this.frame?.remove();
     this.frame = undefined;
+    this.spec = undefined;
+  }
+
+  get isFullscreen(): boolean {
+    return document.fullscreenElement === this.host;
+  }
+
+  async toggleFullscreen(): Promise<void> {
+    if (this.isFullscreen) await document.exitFullscreen();
+    else await this.host.requestFullscreen();
+    this.frame?.focus();
   }
 }

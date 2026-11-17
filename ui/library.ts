@@ -46,18 +46,30 @@ export function renderLibrary(list: HTMLElement, games: SavedGame[], activeId: s
   }
   list.replaceChildren(
     ...games.map((game) => {
+      const active = game.id === activeId;
       const li = document.createElement('li');
-      li.className = game.id === activeId ? 'game active' : 'game';
+      li.className = active ? 'game active' : 'game';
+      if (active) li.setAttribute('aria-current', 'true');
       li.style.setProperty('--swatch', game.spec.theme.background);
 
       const info = document.createElement('div');
       info.className = 'info';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'title-row';
       const title = document.createElement('strong');
       title.textContent = game.title;
+      title.title = game.title;
+      titleRow.append(title);
+      if (active) {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = 'Now playing';
+        titleRow.append(badge);
+      }
       const prompt = document.createElement('span');
       prompt.textContent = game.prompt;
       prompt.title = game.prompt;
-      info.append(title, prompt);
+      info.append(titleRow, prompt);
 
       const buttons = document.createElement('div');
       buttons.className = 'actions';

@@ -16,6 +16,17 @@ export async function fetchHealth(): Promise<Health | undefined> {
   }
 }
 
+/** A failed generation, with a short title for the alert and a longer explanation. */
+export class GenerateFailure extends Error {
+  constructor(
+    readonly title: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'GenerateFailure';
+  }
+}
+
 export interface GenerateCallbacks {
   onStatus?: (progress: GenerateProgress) => void;
   signal?: AbortSignal;
@@ -67,7 +78,7 @@ export async function generateGame(
   }
   for await (const event of readEvents(res.body)) {
     if (event.type === 'status') onStatus?.(event);
-    else if (event.type === 'error') throw new Error(event.message);
+    else if (event.type === 'error') throw new GenerateFailure(event.title, event.message);
     else return { spec: GameSpecSchema.parse(event.spec), attempts: event.attempts };
   }
   throw new Error('The server closed the connection before the game was ready.');
