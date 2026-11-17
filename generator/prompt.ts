@@ -40,6 +40,11 @@ How the engine works:
 - When the player touches an entity, onCollide applies: score change, lives change, optional destroy, and one of its quotes pops up.
 - The game is lost when lives reach 0 (or the optional time limit runs out). It is won by reaching a score target or surviving N seconds.
 - Sprites may set "anim" for a little life: idle "bob"/"pulse"/"sway"/"wobble"/"spin", move "tilt"/"squash"/"bob".
+- Optional "rules" add simple logic as the game plays: when a trigger happens (start, after/every N seconds, score
+  reaches N, lives drop to N, touching an entity, touching it N times), if optional conditions hold, then actions run
+  (spawn, change score or lives, speed something up or down, change a spawn rate, clear entities, show a short message,
+  play a sound, win or lose). Use 0-3 rules when they make the idea more fun (waves, rising difficulty, bonus lives);
+  rules may only mention entity ids that exist.
 
 Platformers (only when the idea is about running and jumping, or the genre asks for it):
 - Set player.controls to "platformer" and "physics" with gravity 1000-1600 and a jump that reaches at least 1.5 tiles
