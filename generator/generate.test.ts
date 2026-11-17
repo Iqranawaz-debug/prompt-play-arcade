@@ -10,6 +10,7 @@ function fakeProvider(replies: string[]) {
   const calls: ChatMessage[][] = [];
   const provider: ChatProvider = {
     name: 'fake',
+    label: 'Fake',
     async complete(messages) {
       calls.push(structuredClone(messages));
       const next = replies.shift();
@@ -75,5 +76,34 @@ describe('generateRemix', () => {
     const msg = calls[0][1].content;
     expect(msg).toContain(JSON.stringify(base));
     expect(msg).toContain('make the comets pink');
+  });
+});
+
+describe('progress and cancellation', () => {
+  it('reports generating, validating and retrying phases', async () => {
+    const { provider } = fakeProvider([broken, valid]);
+    const events: unknown[] = [];
+    await generateSpec(provider, 'x', { onProgress: (p) => events.push(p) });
+    expect(events).toEqual([
+      { phase: 'generating', attempt: 1 },
+      { phase: 'validating', attempt: 1 },
+      { phase: 'retrying', attempt: 2, retry: 1, maxRetries: 2, problems: 1 },
+      { phase: 'validating', attempt: 2 },
+    ]);
+  });
+
+  it('passes the abort signal to the provider', async () => {
+    let seen: AbortSignal | undefined;
+    const provider: ChatProvider = {
+      name: 'fake',
+      label: 'Fake',
+      complete: async (_m, signal) => {
+        seen = signal;
+        return valid;
+      },
+    };
+    const controller = new AbortController();
+    await generateSpec(provider, 'x', { signal: controller.signal });
+    expect(seen).toBe(controller.signal);
   });
 });

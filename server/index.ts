@@ -4,8 +4,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { GameSpecSchema } from '../spec/schema';
 import { providerFromEnv } from '../generator/config';
-import { GenerationError, generateFromIdea, generateRemix } from '../generator/generate';
-import { ProviderError } from '../generator/providers';
+import { generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -17,7 +16,7 @@ app.use(express.json({ limit: '256kb' }));
 const GenerateBody = z.object({ prompt: z.string().trim().min(3).max(2000), base: GameSpecSchema.optional() });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, provider: provider?.name ?? null });
+  res.json({ ok: true, provider: provider?.name ?? null, label: provider?.label ?? null });
 });
 
 app.post('/api/generate', async (req, res) => {
@@ -30,16 +29,39 @@ app.post('/api/generate', async (req, res) => {
     res.status(400).json({ error: 'Send { "prompt": "..." } with 3-2000 characters, plus an optional valid "base" spec.' });
     return;
   }
+  // From here on, progress is streamed as one JSON object per line.
+  res.status(200).setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+  const send = (event: GenerateEvent) => {
+    if (!res.writableEnded) res.write(`${JSON.stringify(event)}\n`);
+  };
+
+  // If the browser cancels or goes away, stop paying for the model call.
+  const cancel = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      cancel.abort(new Error('cancelled by client'));
+      console.log('[generate] cancelled by client');
+    }
+  });
+
   const started = Date.now();
+  const options: GenerateOptions = { signal: cancel.signal, onProgress: (p) => send({ type: 'status', ...p }) };
   try {
     const { prompt, base } = body.data;
-    const { spec, attempts } = base ? await generateRemix(provider, base, prompt) : await generateFromIdea(provider, prompt);
+    const { spec, attempts } = base
+      ? await generateRemix(provider, base, prompt, options)
+      : await generateFromIdea(provider, prompt, options);
     console.log(`[generate] "${spec.title}" in ${attempts} attempt(s), ${Date.now() - started}ms`);
-    res.json({ spec, attempts });
+    send({ type: 'done', spec, attempts });
   } catch (err) {
-    const status = err instanceof GenerationError ? 422 : err instanceof ProviderError ? 502 : 500;
-    console.error('[generate] failed:', (err as Error).message);
-    res.status(status).json({ error: (err as Error).message });
+    if (!cancel.signal.aborted) {
+      console.error('[generate] failed:', (err as Error).message);
+      send({ type: 'error', message: (err as Error).message });
+    }
+  } finally {
+    res.end();
   }
 });
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { providerFromEnv } from './config';
-import { ProviderError, geminiProvider, openAiCompatibleProvider, withFallback, type ChatProvider } from './providers';
+import { ProviderError, geminiProvider, modelLabel, openAiCompatibleProvider, withFallback, type ChatProvider } from './providers';
 
 const msgs = [
   { role: 'system' as const, content: 'sys' },
@@ -52,8 +52,8 @@ describe('openAiCompatibleProvider', () => {
 describe('withFallback / providerFromEnv', () => {
   it('uses the fallback when the primary fails', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const bad: ChatProvider = { name: 'bad', complete: async () => Promise.reject(new ProviderError('down')) };
-    const good: ChatProvider = { name: 'good', complete: async () => 'ok' };
+    const bad: ChatProvider = { name: 'bad', label: 'Bad', complete: async () => Promise.reject(new ProviderError('down')) };
+    const good: ChatProvider = { name: 'good', label: 'Good', complete: async () => 'ok' };
     expect(await withFallback(bad, good).complete(msgs)).toBe('ok');
   });
 
@@ -65,6 +65,22 @@ describe('withFallback / providerFromEnv', () => {
     );
     expect(providerFromEnv({ FALLBACK_API_KEY: 'b', FALLBACK_MODEL: 'mistral-small-latest' })!.name).toBe(
       'openai:mistral-small-latest',
+    );
+  });
+});
+
+describe('modelLabel', () => {
+  it('turns model ids into display names', () => {
+    expect(modelLabel('gemini-2.5-flash')).toBe('Gemini 2.5 Flash');
+    expect(modelLabel('llama-3.3-70b-versatile')).toBe('Llama 3.3 70B Versatile');
+    expect(modelLabel('mistral-small-latest')).toBe('Mistral Small Latest');
+    expect(modelLabel('openai/gpt-4o-mini')).toBe('GPT 4o Mini');
+  });
+
+  it('labels a fallback chain readably', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(providerFromEnv({ LLM_API_KEY: 'a', FALLBACK_API_KEY: 'b' })!.label).toBe(
+      'Gemini 2.5 Flash (fallback: Llama 3.3 70B Versatile)',
     );
   });
 });

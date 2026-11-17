@@ -41,6 +41,25 @@ function check(reply: string): Check {
   return result.success ? { ok: true, spec: result.data } : { ok: false, problems: formatIssues(result.error) };
 }
 
+/** Progress reported while generating; streamed to the browser as it happens. */
+export type GenerateProgress =
+  | { phase: 'generating'; attempt: number }
+  | { phase: 'validating'; attempt: number }
+  | { phase: 'retrying'; attempt: number; retry: number; maxRetries: number; problems: number };
+
+/** One line of the NDJSON stream that POST /api/generate sends back. */
+export type GenerateEvent =
+  | ({ type: 'status' } & GenerateProgress)
+  | { type: 'done'; spec: GameSpec; attempts: number }
+  | { type: 'error'; message: string };
+
+export interface GenerateOptions {
+  maxRetries?: number;
+  onProgress?: (progress: GenerateProgress) => void;
+  /** Aborts the in-flight model request (e.g. when the user cancels). */
+  signal?: AbortSignal;
+}
+
 /**
  * Ask the model for a spec, validating with Zod. On failure the validation errors are sent back
  * and the model gets up to `maxRetries` more tries.
@@ -48,7 +67,7 @@ function check(reply: string): Check {
 export async function generateSpec(
   provider: ChatProvider,
   firstUserMessage: string,
-  maxRetries = MAX_RETRIES,
+  { maxRetries = MAX_RETRIES, onProgress, signal }: GenerateOptions = {},
 ): Promise<GenerateResult> {
   const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -56,17 +75,24 @@ export async function generateSpec(
   ];
   let problems = '';
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-    const reply = await provider.complete(messages);
+    if (attempt === 1) onProgress?.({ phase: 'generating', attempt });
+    const reply = await provider.complete(messages, signal);
+    onProgress?.({ phase: 'validating', attempt });
     const result = check(reply);
     if (result.ok) return { spec: result.spec, attempts: attempt };
     problems = result.problems;
     console.warn(`[generate] attempt ${attempt} invalid:\n${problems}`);
     messages.push({ role: 'assistant', content: reply }, { role: 'user', content: retryPrompt(problems) });
+    if (attempt <= maxRetries) {
+      const count = problems.split('\n').filter((l) => l.startsWith('- ')).length;
+      onProgress?.({ phase: 'retrying', attempt: attempt + 1, retry: attempt, maxRetries, problems: count });
+    }
   }
   throw new GenerationError(`The model did not produce a valid game after ${maxRetries + 1} attempts:\n${problems}`, maxRetries + 1);
 }
 
-export const generateFromIdea = (provider: ChatProvider, idea: string) => generateSpec(provider, userPrompt(idea));
+export const generateFromIdea = (provider: ChatProvider, idea: string, options?: GenerateOptions) =>
+  generateSpec(provider, userPrompt(idea), options);
 
-export const generateRemix = (provider: ChatProvider, base: GameSpec, changes: string) =>
-  generateSpec(provider, remixPrompt(base, changes));
+export const generateRemix = (provider: ChatProvider, base: GameSpec, changes: string, options?: GenerateOptions) =>
+  generateSpec(provider, remixPrompt(base, changes), options);
