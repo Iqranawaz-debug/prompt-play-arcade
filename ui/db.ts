@@ -8,6 +8,8 @@ export interface SavedGame {
   title: string;
   prompt: string;
   spec: GameSpec;
+  /** Id of the game this one was remixed from. */
+  remixOf?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -23,9 +25,9 @@ export function getGame(id: string): Promise<SavedGame | undefined> {
   return db.games.get(id);
 }
 
-export async function addGame(prompt: string, spec: GameSpec): Promise<SavedGame> {
+export async function addGame(prompt: string, spec: GameSpec, remixOf?: string): Promise<SavedGame> {
   const now = Date.now();
-  const game: SavedGame = { id: crypto.randomUUID(), title: spec.title, prompt, spec, createdAt: now, updatedAt: now };
+  const game: SavedGame = { id: crypto.randomUUID(), title: spec.title, prompt, spec, remixOf, createdAt: now, updatedAt: now };
   await db.games.add(game);
   return game;
 }

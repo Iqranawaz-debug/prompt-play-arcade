@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GameSpecSchema } from '../spec/schema';
+import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import { cometCourier } from '../spec/examples/cometCourier';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
 
@@ -35,6 +35,14 @@ ${JSON.stringify(cometCourier)}`;
 
 export function userPrompt(idea: string): string {
   return `Design a game for this idea:\n"""${idea}"""\nReply with the JSON object only.`;
+}
+
+export function remixPrompt(base: GameSpec, changes: string): string {
+  return (
+    `Here is an existing game:\n${JSON.stringify(base)}\n\n` +
+    `Remix it with these changes:\n"""${changes}"""\n` +
+    'Keep everything the changes do not touch. Reply with the complete new JSON object only.'
+  );
 }
 
 export function retryPrompt(problems: string): string {

@@ -14,15 +14,17 @@ export async function fetchHealth(): Promise<Health | undefined> {
   }
 }
 
-/** Ask the local proxy to generate a spec. The server already validated it; we re-check on arrival. */
-export async function generateGame(prompt: string, signal?: AbortSignal): Promise<{ spec: GameSpec; attempts: number }> {
+/**
+ * Ask the local proxy to generate a spec, or to remix `base` when given.
+ * The server already validated the result; we re-check on arrival.
+ */
+export async function generateGame(prompt: string, base?: GameSpec): Promise<{ spec: GameSpec; attempts: number }> {
   let res: Response;
   try {
     res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-      signal,
+      body: JSON.stringify({ prompt, base }),
     });
   } catch {
     throw new Error('Could not reach the local server. Is "npm run dev" running?');

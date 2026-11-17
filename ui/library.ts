@@ -3,6 +3,7 @@ import type { SavedGame } from './db';
 export interface LibraryActions {
   play(game: SavedGame): void;
   remix(game: SavedGame): void;
+  exportHtml(game: SavedGame): void;
   remove(game: SavedGame): void;
 }
 
@@ -63,6 +64,7 @@ export function renderLibrary(list: HTMLElement, games: SavedGame[], activeId: s
       buttons.append(
         button('Play', () => actions.play(game), 'primary'),
         button('Remix', () => actions.remix(game)),
+        button('Export', () => actions.exportHtml(game)),
         deleteButton(() => actions.remove(game)),
       );
       li.append(info, buttons);

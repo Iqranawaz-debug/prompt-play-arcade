@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
+import { SoundFx, collisionSound } from './audio';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, formatTime, popText, showOverlay } from './ui';
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   constructor(
     private readonly spec: GameSpec,
     private readonly canvases: Map<string, HTMLCanvasElement>,
+    private readonly sfx: SoundFx = new SoundFx(),
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
@@ -67,12 +69,16 @@ export class GameScene extends Phaser.Scene {
     this.keys = this.input.keyboard?.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT') as Keys | undefined;
     this.hud = new Hud(this, spec.theme);
     this.refreshHud();
+    this.input.keyboard?.on('keydown-M', () => {
+      this.sfx.unlock();
+      popText(this, this.scale.width / 2, 60, this.sfx.toggleMute() ? 'Sound off' : 'Sound on', spec.theme.text);
+    });
 
     this.physics.pause();
     showOverlay(
       this,
       spec.theme,
-      { title: spec.title, body: spec.messages.intro, footer: 'Click or press Space to start' },
+      { title: spec.title, body: spec.messages.intro, footer: 'Click or press Space to start  -  M toggles sound' },
       () => this.startRound(),
     );
   }
@@ -80,6 +86,8 @@ export class GameScene extends Phaser.Scene {
   private startRound(): void {
     this.phase = 'playing';
     this.physics.resume();
+    this.sfx.unlock();
+    this.sfx.play('start');
     for (const rule of this.spec.spawns) {
       this.time.delayedCall(rule.startDelayMs, () => {
         this.trySpawn(rule);
@@ -183,6 +191,7 @@ export class GameScene extends Phaser.Scene {
     const { score, lives, destroy } = s.spec.onCollide;
     if (lives < 0 && now < this.invulnerableUntil) return;
     s.cooldownUntil = now + HIT_COOLDOWN_MS;
+    this.sfx.play(collisionSound(s.spec.onCollide));
 
     const { theme } = this.spec;
     if (score !== 0) {
@@ -219,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.phase = 'over';
     this.physics.pause();
     this.time.removeAllEvents();
+    this.sfx.play(won ? 'win' : 'lose');
     const { spec } = this;
     showOverlay(
       this,

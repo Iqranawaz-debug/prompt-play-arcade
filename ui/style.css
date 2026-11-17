@@ -53,6 +53,14 @@ button.danger.armed { background: var(--danger); color: #fff; border-color: var(
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.remix-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.6rem; padding: 0.5rem 0.7rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 15%, transparent); border: 1px solid var(--primary);
+  font-size: 0.85rem;
+}
+.remix-banner span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .error { color: var(--danger); font-size: 0.85rem; white-space: pre-wrap; margin: 0.6rem 0 0; }
 
 .library { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }

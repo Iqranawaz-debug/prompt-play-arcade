@@ -2,8 +2,9 @@ import express, { type ErrorRequestHandler } from 'express';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { GameSpecSchema } from '../spec/schema';
 import { providerFromEnv } from '../generator/config';
-import { GenerationError, generateFromIdea } from '../generator/generate';
+import { GenerationError, generateFromIdea, generateRemix } from '../generator/generate';
 import { ProviderError } from '../generator/providers';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -12,7 +13,8 @@ const provider = providerFromEnv(process.env);
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 
-const GenerateBody = z.object({ prompt: z.string().trim().min(3).max(2000) });
+/** `base` is set when remixing: the prompt then describes changes to that spec. */
+const GenerateBody = z.object({ prompt: z.string().trim().min(3).max(2000), base: GameSpecSchema.optional() });
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, provider: provider?.name ?? null });
@@ -25,12 +27,13 @@ app.post('/api/generate', async (req, res) => {
   }
   const body = GenerateBody.safeParse(req.body);
   if (!body.success) {
-    res.status(400).json({ error: 'Send { "prompt": "..." } with 3-2000 characters.' });
+    res.status(400).json({ error: 'Send { "prompt": "..." } with 3-2000 characters, plus an optional valid "base" spec.' });
     return;
   }
   const started = Date.now();
   try {
-    const { spec, attempts } = await generateFromIdea(provider, body.data.prompt);
+    const { prompt, base } = body.data;
+    const { spec, attempts } = base ? await generateRemix(provider, base, prompt) : await generateFromIdea(provider, prompt);
     console.log(`[generate] "${spec.title}" in ${attempts} attempt(s), ${Date.now() - started}ms`);
     res.json({ spec, attempts });
   } catch (err) {

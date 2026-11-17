@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameSpecSchema } from '../spec/schema';
 import { GameScene } from './GameScene';
+import { SoundFx } from './audio';
 import { rasterizeSprites } from './textures';
 
 export const WORLD = { width: 800, height: 600 } as const;
@@ -18,6 +19,7 @@ export async function runGame(input: unknown, parent: HTMLElement): Promise<Phas
     physics: { default: 'arcade', arcade: { debug: false } },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     banner: false,
-    scene: [new GameScene(spec, canvases)],
+    audio: { noAudio: true }, // sounds come from our own Web Audio synth
+    scene: [new GameScene(spec, canvases, new SoundFx())],
   });
 }

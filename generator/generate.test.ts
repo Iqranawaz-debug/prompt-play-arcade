@@ -65,3 +65,15 @@ describe('system prompt', () => {
     for (const ex of examples) expect(GameSpecSchema.safeParse(JSON.parse(ex)).success).toBe(true);
   });
 });
+
+describe('generateRemix', () => {
+  it('sends the base spec and the requested changes', async () => {
+    const { generateRemix } = await import('./generate');
+    const { provider, calls } = fakeProvider([valid]);
+    const base = GameSpecSchema.parse(cometCourier);
+    await generateRemix(provider, base, 'make the comets pink');
+    const msg = calls[0][1].content;
+    expect(msg).toContain(JSON.stringify(base));
+    expect(msg).toContain('make the comets pink');
+  });
+});

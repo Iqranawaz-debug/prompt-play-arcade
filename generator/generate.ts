@@ -1,5 +1,5 @@
 import { GameSpecSchema, formatIssues, type GameSpec } from '../spec/schema';
-import { SYSTEM_PROMPT, retryPrompt, userPrompt } from './prompt';
+import { SYSTEM_PROMPT, remixPrompt, retryPrompt, userPrompt } from './prompt';
 import type { ChatMessage, ChatProvider } from './providers';
 
 export const MAX_RETRIES = 2;
@@ -67,3 +67,6 @@ export async function generateSpec(
 }
 
 export const generateFromIdea = (provider: ChatProvider, idea: string) => generateSpec(provider, userPrompt(idea));
+
+export const generateRemix = (provider: ChatProvider, base: GameSpec, changes: string) =>
+  generateSpec(provider, remixPrompt(base, changes));

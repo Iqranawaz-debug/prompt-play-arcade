@@ -13,7 +13,11 @@
     <main>
       <section class="panel">
         <form id="gen-form">
-          <label for="prompt">Describe a game</label>
+          <div id="remix-banner" class="remix-banner" hidden>
+            <span id="remix-label"></span>
+            <button id="remix-cancel" type="button">Cancel</button>
+          </div>
+          <label id="prompt-label" for="prompt">Describe a game</label>
           <textarea
             id="prompt"
             rows="4"

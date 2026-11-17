@@ -64,6 +64,10 @@ export const EntitySchema = z.object({
     score: z.number().int().min(-100).max(100).default(0),
     lives: z.number().int().min(-3).max(3).default(0).describe('Negative = damage'),
     destroy: z.boolean().default(true).describe('Remove the entity after touching the player'),
+    sfx: z
+      .enum(['auto', 'pickup', 'big', 'hurt', 'heal', 'pop', 'none'])
+      .default('auto')
+      .describe('Sound on touch; auto picks one from the score/lives effect'),
   }),
   quotes: z
     .array(z.string().min(1).max(80))

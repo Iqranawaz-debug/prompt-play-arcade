@@ -1,6 +1,7 @@
 import './style.css';
 import { fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './db';
+import { exportGame } from './export';
 import { renderLibrary } from './library';
 import { GamePlayer } from './player';
 
@@ -8,15 +9,21 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const form = $<HTMLFormElement>('gen-form');
 const promptBox = $<HTMLTextAreaElement>('prompt');
+const promptLabel = $('prompt-label');
 const generateBtn = $<HTMLButtonElement>('generate');
 const genStatus = $('gen-status');
 const genError = $('gen-error');
+const remixBanner = $('remix-banner');
+const remixLabel = $('remix-label');
 const providerStatus = $('provider-status');
 const libraryList = $('library');
 const stageTitle = $('stage-title');
 const stageError = $('stage-error');
 
+const DEFAULT_PLACEHOLDER = promptBox.placeholder;
 let activeId: string | undefined;
+/** When set, the prompt box describes changes to this game instead of a new idea. */
+let remixTarget: SavedGame | undefined;
 
 const showError = (el: HTMLElement, message?: string) => {
   el.hidden = !message;
@@ -29,7 +36,7 @@ const player = new GamePlayer($('stage-frame'), {
 });
 
 async function refreshLibrary(): Promise<void> {
-  renderLibrary(libraryList, await listGames(), activeId, { play, remix, remove });
+  renderLibrary(libraryList, await listGames(), activeId, { play, remix, exportHtml, remove });
 }
 
 async function play(game: SavedGame): Promise<void> {
@@ -44,14 +51,37 @@ async function play(game: SavedGame): Promise<void> {
   }
 }
 
+function buttonLabel(busy: boolean): string {
+  if (busy) return remixTarget ? 'Remixing…' : 'Generating…';
+  return remixTarget ? 'Remix' : 'Generate';
+}
+
+function setRemixTarget(game: SavedGame | undefined): void {
+  remixTarget = game;
+  remixBanner.hidden = !game;
+  remixLabel.textContent = game ? `Remixing "${game.title}"` : '';
+  promptLabel.textContent = game ? 'What should change?' : 'Describe a game';
+  promptBox.placeholder = game ? 'e.g. make it night time and add a shark that chases you' : DEFAULT_PLACEHOLDER;
+  generateBtn.textContent = buttonLabel(false);
+}
+
 function remix(game: SavedGame): void {
-  promptBox.value = game.prompt;
+  setRemixTarget(game);
+  promptBox.value = '';
   promptBox.focus();
-  promptBox.setSelectionRange(promptBox.value.length, promptBox.value.length);
+}
+
+async function exportHtml(game: SavedGame): Promise<void> {
+  try {
+    await exportGame(game.spec);
+  } catch (err) {
+    showError(genError, (err as Error).message);
+  }
 }
 
 async function remove(game: SavedGame): Promise<void> {
   await deleteGame(game.id);
+  if (remixTarget?.id === game.id) setRemixTarget(undefined);
   if (activeId === game.id) {
     activeId = undefined;
     player.stop();
@@ -64,7 +94,7 @@ function setBusy(busy: boolean): () => void {
   generateBtn.disabled = busy;
   promptBox.disabled = busy;
   generateBtn.classList.toggle('loading', busy);
-  generateBtn.textContent = busy ? 'Generating…' : 'Generate';
+  generateBtn.textContent = buttonLabel(busy);
   if (!busy) return () => {};
   const started = Date.now();
   const tick = () => (genStatus.textContent = `Designing your game… ${Math.round((Date.now() - started) / 1000)}s`);
@@ -81,11 +111,16 @@ form.addEventListener('submit', async (e) => {
     return;
   }
   showError(genError);
+  const base = remixTarget;
   const stopTimer = setBusy(true);
   try {
-    const { spec, attempts } = await generateGame(prompt);
-    const game = await addGame(prompt, spec);
+    const { spec, attempts } = await generateGame(prompt, base?.spec);
+    const game = base
+      ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, base.id)
+      : await addGame(prompt, spec);
     genStatus.textContent = `Created "${spec.title}"${attempts > 1 ? ` (after ${attempts} attempts)` : ''}.`;
+    promptBox.value = '';
+    setRemixTarget(undefined);
     await play(game);
   } catch (err) {
     genStatus.textContent = '';
@@ -95,6 +130,8 @@ form.addEventListener('submit', async (e) => {
     setBusy(false);
   }
 });
+
+$('remix-cancel').addEventListener('click', () => setRemixTarget(undefined));
 
 promptBox.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit();
