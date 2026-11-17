@@ -91,7 +91,9 @@ h1, h2, h3, p { margin: 0; }
   display: flex; flex-direction: column; gap: var(--s-3);
   padding: var(--s-4);
   border-radius: var(--r-xl);
-  background: linear-gradient(180deg, rgb(22 29 43 / 0.92), rgb(13 18 28 / 0.92));
+  /* Frosted, slightly translucent: the ambient shapes glow through softly. */
+  background: linear-gradient(180deg, rgb(22 29 43 / 0.72), rgb(13 18 28 / 0.8));
+  backdrop-filter: blur(22px) saturate(140%);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md), var(--highlight);
   overflow: hidden;

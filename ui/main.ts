@@ -2,6 +2,7 @@ import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/components.css';
 import './styles/overlays.css';
+import './styles/effects.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, enhancePrompt, fetchHealth, generateGame } from './api';
 import { addGame, addVersion, currentVersionOf, deleteGame, listGames, listPlays, markPlayed, recordPlay, restoreVersion, seedIfEmpty, setFavorite, type SavedGame } from './db';
@@ -15,6 +16,7 @@ import { GENRES } from './genre';
 import { SORTS, filterCounts, queryGames, type LibraryFilter, type LibraryQuery, type LibrarySort } from './libraryQuery';
 import { exportGame } from './export';
 import { startAmbient } from './ambient';
+import { startSpotlight } from './effects';
 import { createSettingsDrawer } from './drawer';
 import { createNotificationCenter, notify } from './notifications';
 import { createCommandPalette, type Command } from './palette';
@@ -90,6 +92,7 @@ function showGameStatus(s: GameStatus | 'loading' | undefined): void {
   const phase = s === undefined ? 'idle' : s === 'loading' ? 'loading' : s.phase;
   gameStatus.dataset.phase = phase;
   currentPhase = phase;
+  document.documentElement.classList.toggle('game-running', phase === 'playing');
   gameStatus.textContent = PHASE_LABEL[phase];
   libraryList.querySelector('.game.active')?.setAttribute('data-phase', phase);
   gameStats.hidden = typeof s !== 'object';
@@ -647,6 +650,24 @@ $('open-settings').addEventListener('click', () => settingsDrawer.open());
 
 async function init(): Promise<void> {
   startAmbient($<HTMLCanvasElement>('ambient-stars'));
+  startSpotlight();
+  // 3D ambient objects: also code-split, loaded only while enabled in Settings.
+  let unmountAmbient3d: (() => void) | undefined;
+  onSettings((st) => {
+    const host = document.querySelector<HTMLElement>('.ambient')!;
+    if (st.ambient3d && !unmountAmbient3d) {
+      unmountAmbient3d = () => {};
+      import('./ambient3d')
+        .then(({ mountAmbient3d }) => {
+          if (!getSettings().ambient3d) return void (unmountAmbient3d = undefined);
+          unmountAmbient3d = mountAmbient3d(host);
+        })
+        .catch(() => (unmountAmbient3d = undefined));
+    } else if (!st.ambient3d && unmountAmbient3d) {
+      unmountAmbient3d();
+      unmountAmbient3d = undefined;
+    }
+  });
   // The 3D controller is code-split: Three.js loads in the background after the UI is up.
   // The 3D controller is code-split: Three.js loads in the background, only if enabled in Settings.
   let unmount3d: (() => void) | undefined;
