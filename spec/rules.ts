@@ -4,7 +4,8 @@ import { z } from 'zod';
  * Game logic as data: "When <trigger>, if <conditions>, then <actions>". The engine interprets these; nothing here is
  * code, so rules are as safe as the rest of the spec. Kept deliberately small so the builder UI can show every option.
  */
-const Ref = z.string().regex(/^[a-z][a-z0-9_]{0,31}$/, 'entity ids are lowercase letters, digits and underscores');
+/** An entity id. Mods may also say "@hazard" / "@reward"; games reject those via the unknown-entity check. */
+const Ref = z.string().regex(/^(@hazard|@reward|[a-z][a-z0-9_]{0,31})$/, 'entity ids are lowercase letters, digits and underscores');
 
 export const TriggerSchema = z.discriminatedUnion('on', [
   z.object({ on: z.literal('start') }).describe('When a level starts'),
