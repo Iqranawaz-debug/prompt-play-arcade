@@ -15,6 +15,7 @@ import { keyLabel } from '../spec/controls';
 import { createCharacterCreator } from './studio/character';
 import { createDebugger } from './studio/debugger';
 import { createSoundDesigner } from './studio/sound';
+import { createAssetStudio } from './studio/assets';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
 import { decodeSpec, sharedFromHash } from './share';
 import { createShareDialog } from './shareDialog';
@@ -562,6 +563,7 @@ function commands(): Command[] {
       id: 'recent', group: 'Navigate', title: 'Show recently played games', keywords: 'history library last',
       run: () => setLibQuery({ filter: 'recent' }),
     },
+    { id: 'assets', group: 'Studio', title: 'Asset Studio', keywords: 'sprites colours colors theme images art redraw upload svg', disabled: !current, run: () => assetTool.open() },
     { id: 'sound-designer', group: 'Studio', title: 'Sound Designer', keywords: 'music audio sfx soundtrack effects', disabled: !current, run: () => soundTool.open() },
     { id: 'debug', group: 'Studio', title: 'Debug this game', keywords: 'bug problem broken fix help not working', disabled: !current, run: () => debugTool.open() },
     { id: 'character', group: 'Studio', title: 'Character Creator', keywords: 'hero player sprite create design avatar', run: () => characterTool.open() },
@@ -687,11 +689,13 @@ storyboardBtn.addEventListener('click', () => storyboardTool.open(promptBox.valu
 const characterTool = createCharacterCreator($('overlays'), studio);
 const debugTool = createDebugger($('overlays'), studio);
 const soundTool = createSoundDesigner($('overlays'), studio);
+const assetTool = createAssetStudio($('overlays'), studio);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */
 const studioItems: MenuItem[] = [
   { label: 'Character Creator', hint: 'Describe a hero; get a sprite and stats', icon: STUDIO_ICONS.character, run: () => characterTool.open() },
+  { label: 'Asset Studio', hint: 'Colours and sprites: resize, redraw, upload', icon: STUDIO_ICONS.assets, run: () => assetTool.open(), disabled: noGame },
   { label: 'Sound Designer', hint: 'Background music and collision sounds', icon: STUDIO_ICONS.sound, run: () => soundTool.open(), disabled: noGame },
   { label: 'Debug this game', hint: 'Describe a problem; get a diagnosis and fix', icon: STUDIO_ICONS.debug, run: () => debugTool.open(), disabled: noGame },
 ];
