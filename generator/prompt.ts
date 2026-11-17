@@ -32,7 +32,13 @@ Sprites (inline SVG, shown at only 24-64 px, so they must read instantly):
 - Contrast: every sprite's main colour must stand out clearly from theme.background (bright, saturated colours on dark
   backgrounds, deep colours on light ones). Give the body a darker outline stroke (stroke-width 1.5-2.5) so it never
   blends in. Avoid greys and browns that are close to the background's brightness.
-- Creatures get eyes: a white circle with a dark pupil. Make the player the most distinctive sprite (40-64 px).
+- Living creatures get eyes: a white circle with a dark pupil.
+- Machines, vehicles and objects are drawn as the real thing, not as a face: show its 2-3 signature parts from one
+  consistent viewpoint (top-down for floor, table and arena games; side-on otherwise). E.g. a robot vacuum seen from
+  above = round body, darker bumper ring around the front, small sensor turret, two side brushes sticking out; a car =
+  body, windows, wheels. Add small eyes only if the idea calls the object cute or alive, and never let them replace
+  the signature parts.
+- Make the player the most distinctive sprite (40-64 px).
   Rewards should look appealing (bright, warm), hazards should look dangerous (spikes, angry eyes, red or purple).
 - "Glowing" things: put a larger circle or ellipse behind them in a light colour with fill-opacity 0.25-0.4.
 
