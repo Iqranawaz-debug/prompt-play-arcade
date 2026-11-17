@@ -18,6 +18,7 @@ import { createSoundDesigner } from './studio/sound';
 import { createPhysicsSettings } from './studio/physics';
 import { createAnimationStudio } from './studio/animation';
 import { createLevelEditor } from './studio/levelEditor';
+import { aiLevelPanel } from './studio/levelDesigner';
 import { createAssetStudio } from './studio/assets';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
 import { decodeSpec, sharedFromHash } from './share';
@@ -699,14 +700,14 @@ const soundTool = createSoundDesigner($('overlays'), studio);
 const assetTool = createAssetStudio($('overlays'), studio);
 const physicsTool = createPhysicsSettings($('overlays'), studio);
 const animationTool = createAnimationStudio($('overlays'), studio);
-const levelTool = createLevelEditor($('overlays'), studio);
+const levelTool = createLevelEditor($('overlays'), studio, aiLevelPanel);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */
 const studioItems: MenuItem[] = [
   { label: 'Character Creator', hint: 'Describe a hero; get a sprite and stats', icon: STUDIO_ICONS.character, run: () => characterTool.open() },
   { label: 'Asset Studio', hint: 'Colours and sprites: resize, redraw, upload', icon: STUDIO_ICONS.assets, run: () => assetTool.open(), disabled: noGame },
-  { label: 'Level Editor', hint: 'Paint maps, add levels, generate worlds', icon: STUDIO_ICONS.levels, run: () => levelTool.open(), disabled: noGame },
+  { label: 'Level Editor', hint: 'Paint maps, generate worlds, design levels with AI', icon: STUDIO_ICONS.levels, run: () => levelTool.open(), disabled: noGame },
   { label: 'Animation Studio', hint: 'Idle and move motions, AI-drawn frames', icon: STUDIO_ICONS.animation, run: () => animationTool.open(), disabled: noGame },
   { label: 'Physics Settings', hint: 'Movement, gravity, jumping; make it a platformer', icon: STUDIO_ICONS.physics, run: () => physicsTool.open(), disabled: noGame },
   { label: 'Sound Designer', hint: 'Background music and collision sounds', icon: STUDIO_ICONS.sound, run: () => soundTool.open(), disabled: noGame },

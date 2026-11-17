@@ -8,7 +8,7 @@ import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isQuotaError, isTransientStatus, type ChatProvider } from '../generator/providers';
 import { AskError } from '../generator/ask';
-import { animateSprite, debugGame, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
+import { animateSprite, debugGame, designLevels, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -92,6 +92,13 @@ toolRoute(
   '/api/frames',
   z.object({ sprite: SpriteSchema, motion: z.string().trim().min(3).max(300), count: z.number().int().min(1).max(3), background: Hex }),
   async (b, p, signal) => ({ frames: await animateSprite(p, b.sprite, b.motion, b.count, b.background, signal) }),
+);
+
+/** New levels for a game (AI Level Designer), validated against the game's own movement. */
+toolRoute(
+  '/api/levels',
+  z.object({ spec: GameSpecSchema, request: z.string().trim().min(3).max(600), count: z.number().int().min(1).max(4) }),
+  async (b, p, signal) => ({ levels: await designLevels(p, b.spec, b.request, b.count, signal) }),
 );
 
 app.post('/api/generate', async (req, res) => {

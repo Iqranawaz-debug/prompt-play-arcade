@@ -1,5 +1,5 @@
 import type { GenerateEvent, GenerateProgress } from '../generator/generate';
-import { GameSpecSchema, type GameSpec } from '../spec/schema';
+import { GameSpecSchema, LevelSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
 import { z } from 'zod';
 import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
@@ -124,3 +124,6 @@ export const fetchSprite = (sprite: GameSpec['sprites'][string], change: string,
 
 export const fetchFrames = (sprite: GameSpec['sprites'][string], motion: string, count: number, background: string, signal?: AbortSignal) =>
   postTool('/api/frames', { sprite, motion, count, background }, FramesResultSchema, 'Could not animate the sprite', signal).then((r) => r.frames);
+
+export const fetchLevels = (spec: GameSpec, request: string, count: number, signal?: AbortSignal) =>
+  postTool('/api/levels', { spec, request, count }, z.object({ levels: z.array(LevelSchema.extend({ name: z.string() })) }), 'Could not design levels', signal).then((r) => r.levels);

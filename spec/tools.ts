@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GameSpecSchema, PlayerSchema, SpriteSchema } from './schema';
+import { GameSpecSchema, LevelSchema, PlayerSchema, SpriteSchema, levelsOf, type GameSpec } from './schema';
 
 /** Contracts for the AI studio tools. Shared by the server (validation) and the UI (types). */
 
@@ -88,3 +88,24 @@ export const SpriteResultSchema = z.object({ sprite: SpriteSchema });
 export const FramesResultSchema = z.object({
   frames: SpriteSchema.shape.frames.unwrap().min(1).describe('Extra frames, same viewBox and size as the original'),
 });
+
+// ---------- Level design ----------
+const DesignedLevel = LevelSchema.extend({ name: z.string().min(1).max(40) });
+export type DesignedLevel = z.infer<typeof DesignedLevel>;
+
+/**
+ * Levels for `spec`, validated in context: appended to the game's existing levels, the whole game must still pass the
+ * schema (sizes, characters, reachability for this game's movement and jump), so retries get the exact problems.
+ */
+export function levelsResultSchema(spec: GameSpec, count: number) {
+  const existing = levelsOf(spec);
+  return z.object({ levels: z.array(DesignedLevel).min(1).max(count) }).superRefine((r, ctx) => {
+    const trial = { ...spec, level: undefined, levels: [...existing, ...r.levels] };
+    const result = GameSpecSchema.safeParse(trial);
+    if (result.success) return;
+    for (const i of result.error.issues) {
+      if (i.path[0] !== 'levels' || typeof i.path[1] !== 'number' || i.path[1] < existing.length) continue;
+      ctx.addIssue({ code: 'custom', path: ['levels', i.path[1] - existing.length, ...i.path.slice(2)], message: i.message });
+    }
+  });
+}

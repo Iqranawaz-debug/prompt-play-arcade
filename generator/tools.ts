@@ -1,17 +1,20 @@
-import type { GameSpec } from '../spec/schema';
+import { levelsOf, type GameSpec } from '../spec/schema';
+import { DEFAULT_TILE, maxCols, maxRows, parseLevel } from '../spec/level';
+import { jumpReach } from '../spec/reach';
 import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { lintSpec } from '../spec/lint';
-import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
+import { CharacterSchema, DebugResultSchema, FramesResultSchema, levelsResultSchema, type DesignedLevel, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 import { askJson } from './ask';
 import { SPRITE_RULES, jsonSchema } from './prompt';
 import type { ChatProvider } from './providers';
 
 /** What the engine can and cannot do; keeps every tool's suggestions buildable. */
-const ENGINE_FACTS = `The engine makes 2D arcade games on a 960 x 540 screen. The player moves freely, left-right or up-down
-(arrow keys/WASD or dragging). Entities spawn from screen edges and move: straight, zigzag, chase, flee, wander,
-bounce or static. Touching an entity changes score and/or lives. A round is won by reaching a score or surviving
-a time; it is lost when lives run out or time runs out. There is no gravity, no jumping, no walls, no shooting,
-no inventory and no dialogue.`;
+const ENGINE_FACTS = `The engine makes 2D arcade games on a 960 x 540 screen. The player moves freely, left-right, up-down,
+or as a platformer (run and jump with gravity). Optional tile maps add walls and ledges, and a game can have up to 8
+levels played in order. Entities spawn from screen edges, anywhere, or on top of ledges, and move: straight, zigzag,
+chase, flee, wander, bounce, patrol (walks ledges) or static. Touching an entity changes score and/or lives. A level is
+won by reaching a score or surviving a time; the game is lost when lives run out or time runs out. There is no
+shooting, no inventory and no dialogue.`;
 
 // ---------- Storyboard ----------
 export function makeStoryboard(provider: ChatProvider, idea: string, options?: GameOptions, signal?: AbortSignal): Promise<Storyboard> {
@@ -108,4 +111,41 @@ Reply with JSON only: {"frames":["<svg ...>...</svg>", ...]} with exactly ${coun
     user: `Original sprite:\n${JSON.stringify({ svg: sprite.svg, width: sprite.width, height: sprite.height })}\n\nMotion to animate:\n"""${motion}"""`,
   });
   return result.frames.slice(0, count);
+}
+
+// ---------- Level design (AI Level Designer) ----------
+export async function designLevels(
+  provider: ChatProvider,
+  spec: GameSpec,
+  request: string,
+  count: number,
+  signal?: AbortSignal,
+): Promise<DesignedLevel[]> {
+  const platformer = spec.player.controls === 'platformer';
+  const existing = levelsOf(spec);
+  const cols = maxCols(DEFAULT_TILE);
+  const rows = maxRows(DEFAULT_TILE);
+  const reach = platformer && spec.physics ? jumpReach(parseLevel({ tileSize: DEFAULT_TILE, map: [''] }), { platformer, speed: spec.player.speed, jump: spec.physics.jump, gravity: spec.physics.gravity }) : undefined;
+  const rules = platformer
+    ? `This is a PLATFORMER. The bottom row should be solid ground ("#" x ${cols}). The player can jump at most ${reach?.up} rows
+up and about ${reach?.across} columns across, so every ledge must be reachable by a chain of jumps from the start.
+Ledges are horizontal runs of "#" 2-8 long, at least 2 rows apart vertically. Leave the top 2 rows mostly empty.`
+    : `This is a TOP-DOWN game: "#" tiles are walls seen from above. Every empty tile must be reachable from the start (no
+sealed rooms); keep corridors at least 2 tiles wide, and keep the outer edge mostly open so entities can enter.`;
+  const result = await askJson(provider, {
+    schema: levelsResultSchema(spec, count),
+    signal,
+    system: `You design tile-map levels for an existing 2D game.
+${ENGINE_FACTS}
+Each level: {"name", "tileSize": 40, "map": [...]} where map is up to ${rows} strings (rows, top to bottom) of up to ${cols}
+characters: "#" = wall/ledge, "." = empty, and optionally one "P" = player start. Short rows are padded with empty.
+${rules}
+Make the levels fit the game's theme and get gradually harder (more hazards' room to roam, trickier jumps, tighter paths).
+Give each level a short evocative name.
+Reply with JSON only: {"levels":[{"name","tileSize","map"}]} with exactly ${count} level(s).`,
+    user: `The game:\n${JSON.stringify({ title: spec.title, description: spec.description, player: spec.player, physics: spec.physics, entities: spec.entities.map((e) => ({ name: e.name, behavior: e.behavior })) })}\n\n` +
+      (existing.length ? `Its current levels (new ones are added after these):\n${JSON.stringify(existing)}\n\n` : '') +
+      `Request:\n"""${request}"""`,
+  });
+  return result.levels.slice(0, count);
 }

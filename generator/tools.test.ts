@@ -143,3 +143,19 @@ describe('animateSprite', () => {
     expect(calls[0][0].content).toContain('exactly 2 frame(s)');
   });
 });
+
+describe('designLevels', () => {
+  it('sends level problems back and returns levels that fit the game', async () => {
+    const { designLevels } = await import('./tools');
+    const { lanternHop } = await import('../spec/examples/lanternHop');
+    const hop = GameSpecSchema.parse(lanternHop);
+    const tooHigh = { name: 'Sky', tileSize: 40, map: ['', '', '....####', '', '', '', '', '', '', '', '', '#'.repeat(24)] };
+    const good = { name: 'Steps', tileSize: 40, map: ['', '', '', '', '', '', '', '', '....####', '', '', '#'.repeat(24)] };
+    const { provider, calls } = fake([JSON.stringify({ levels: [tooHigh] }), JSON.stringify({ levels: [good] })]);
+    const levels = await designLevels(provider, hop, 'a harder level', 1);
+    expect(levels).toEqual([good]);
+    expect(calls[1].at(-1)!.content).toContain('levels.0.map: ');
+    expect(calls[1].at(-1)!.content).toContain('cannot be reached');
+    expect(calls[0][0].content).toContain('PLATFORMER');
+  });
+});
