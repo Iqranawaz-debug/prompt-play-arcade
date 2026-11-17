@@ -5,6 +5,7 @@ import { Controls } from './controls';
 import { Music } from './music';
 import { keyLabel } from '../spec/controls';
 import type { GameStatus } from './status';
+import type { SaveState } from '../spec/saveState';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { Animator } from './animate';
 import { atLedge, buildLevel, inWall, liftOutOfWalls, type Level } from './level';
@@ -66,6 +67,8 @@ export class GameScene extends Phaser.Scene {
     private readonly onStatus: (status: GameStatus) => void = () => {},
     /** Keyboard (remappable) and gamepad input, shared across round restarts. */
     private readonly controls: Controls = new Controls(),
+    /** A saved round to continue from; used once, on the first start. */
+    private resume?: SaveState,
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
@@ -88,6 +91,12 @@ export class GameScene extends Phaser.Scene {
     this.levelIndex = data.levelIndex ?? 0;
     this.carriedLives = data.lives;
     this.carriedScore = data.total ?? 0;
+    if (this.resume && this.resume.levelIndex >= this.levelCount) this.resume = undefined; // the game changed shape
+    if (this.resume) {
+      this.levelIndex = this.resume.levelIndex;
+      this.carriedLives = this.resume.lives;
+      this.carriedScore = this.resume.carried;
+    }
   }
 
   private get levelCount(): number {
@@ -134,6 +143,7 @@ export class GameScene extends Phaser.Scene {
     this.refreshHud();
 
     this.physics.pause();
+    if (this.resume) return this.restore(this.resume);
     showOverlay(
       this,
       spec.theme,
@@ -169,7 +179,10 @@ export class GameScene extends Phaser.Scene {
     this.music.start(this.spec.audio.music, this.spec.audio.volume);
     this.events.once('shutdown', () => this.music.stop());
     for (const rule of this.spec.spawns) {
-      this.time.delayedCall(rule.startDelayMs, () => {
+      // Fresh rounds wait startDelayMs; resumed rounds pick up the spawn rhythm where it was.
+      const since = this.elapsedMs - rule.startDelayMs;
+      const first = since < 0 ? -since : rule.everyMs - (since % rule.everyMs);
+      this.time.delayedCall(first, () => {
         this.trySpawn(rule);
         this.time.addEvent({ delay: rule.everyMs, loop: true, callback: () => this.trySpawn(rule) });
       });
@@ -197,11 +210,67 @@ export class GameScene extends Phaser.Scene {
       pos.y = Phaser.Math.Clamp(pos.y, FIELD.y + def.height, FIELD.y + FIELD.h - def.height);
     }
 
+    this.addEntity(spec, pos, newMover(dir, spec.behavior), false);
+  }
+
+  private addEntity(spec: EntitySpec, pos: { x: number; y: number }, mover: MoverState, entered: boolean): Body {
+    const def = this.spec.sprites[spec.sprite];
     const sprite = this.entities.create(pos.x, pos.y, texKey(spec.sprite)) as Body;
     sizeSprite(sprite, def);
-    this.state.set(sprite, { spec, mover: newMover(dir, spec.behavior), entered: false, cooldownUntil: 0 });
-    if (this.walker(spec)) sprite.body.setGravityY(this.gravity);
+    this.state.set(sprite, { spec, mover, entered, cooldownUntil: 0 });
+    if (this.walker(spec)) {
+      sprite.body.setGravityY(this.gravity);
+      if (entered) sprite.setCollideWorldBounds(true);
+    }
     this.animator.attach(sprite, spec.sprite, def);
+    return sprite;
+  }
+
+  /** Snapshot of the round in progress, or undefined between rounds. */
+  snapshot(): SaveState | undefined {
+    if (this.phase !== 'playing' || this.lives < 1) return undefined;
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const vec = (v: { x: number; y: number }) => ({ x: round(v.x), y: round(v.y) });
+    return {
+      v: 1,
+      levelIndex: this.levelIndex,
+      carried: this.carriedScore,
+      score: this.score,
+      lives: this.lives,
+      elapsedMs: Math.round(this.elapsedMs),
+      player: { pos: vec(this.player), vel: vec(this.player.body.velocity), flip: this.player.flipX },
+      entities: (this.entities.getChildren() as Body[]).flatMap((e) => {
+        const s = this.state.get(e);
+        return s ? [{ id: s.spec.id, pos: vec(e), vel: vec(e.body.velocity), entered: s.entered, mover: { ...s.mover, dir: vec(s.mover.dir) } }] : [];
+      }),
+    };
+  }
+
+  /** Put a saved round back on screen, paused behind a "Resume" card. */
+  private restore(save: SaveState): void {
+    this.resume = undefined; // later restarts (play again, next level) start fresh
+    this.score = save.score;
+    this.elapsedMs = save.elapsedMs;
+    this.player.setPosition(save.player.pos.x, save.player.pos.y).setVelocity(save.player.vel.x, save.player.vel.y).setFlipX(save.player.flip);
+    for (const e of save.entities) {
+      const spec = this.entityById.get(e.id);
+      if (!spec) continue;
+      this.addEntity(spec, e.pos, structuredClone(e.mover), e.entered).setVelocity(e.vel.x, e.vel.y);
+    }
+    this.refreshHud();
+    showOverlay(
+      this,
+      this.spec.theme,
+      {
+        eyebrow: this.levelCount > 1 ? `Saved game · level ${this.levelIndex + 1} of ${this.levelCount}` : 'Saved game',
+        title: this.spec.title,
+        body: 'Everything is where you left it.',
+        stat: { value: String(this.carriedScore + this.score), label: this.spec.score.label },
+        cta: this.cta('resume'),
+      },
+      () => this.startRound(),
+      this.controls,
+    );
   }
 
   update(_time: number, delta: number): void {

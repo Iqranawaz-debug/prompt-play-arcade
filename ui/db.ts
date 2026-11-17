@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import type { SaveState } from '../spec/saveState';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
@@ -50,9 +51,19 @@ export interface PlayRecord {
   endedAt: number;
 }
 
+/** A saved round in progress, tied to the game version it was played on. */
+export interface SaveRecord {
+  id?: number;
+  gameId: string;
+  version: number;
+  createdAt: number;
+  state: SaveState;
+}
+
 const db = new Dexie('game-generator') as Dexie & {
   games: EntityTable<SavedGame, 'id'>;
   plays: EntityTable<PlayRecord, 'id'>;
+  saves: EntityTable<SaveRecord, 'id'>;
 };
 db.version(1).stores({ games: 'id, updatedAt' });
 db.version(2)
@@ -66,6 +77,26 @@ db.version(2)
         g.genre ??= guessGenre(g.spec);
       }),
   );
+db.version(3).stores({ saves: '++id, gameId, createdAt' });
+
+/** Saves per game are capped; the oldest go first. */
+export const MAX_SAVES = 10;
+
+export async function addSave(gameId: string, version: number, state: SaveState): Promise<void> {
+  await db.transaction('rw', db.saves, async () => {
+    await db.saves.add({ gameId, version, createdAt: Date.now(), state });
+    const all = await db.saves.where('gameId').equals(gameId).sortBy('createdAt');
+    await db.saves.bulkDelete(all.slice(0, Math.max(0, all.length - MAX_SAVES)).map((s) => s.id!));
+  });
+}
+
+export async function listSaves(gameId: string): Promise<SaveRecord[]> {
+  return (await db.saves.where('gameId').equals(gameId).sortBy('createdAt')).reverse();
+}
+
+export async function deleteSave(id: number): Promise<void> {
+  await db.saves.delete(id);
+}
 
 export function listGames(): Promise<SavedGame[]> {
   return db.games.orderBy('updatedAt').reverse().toArray();
@@ -94,9 +125,10 @@ export async function addGame(prompt: string, spec: GameSpec, extra: { remixOf?:
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  await db.transaction('rw', db.games, db.plays, async () => {
+  await db.transaction('rw', db.games, db.plays, db.saves, async () => {
     await db.games.delete(id);
     await db.plays.where('gameId').equals(id).delete();
+    await db.saves.where('gameId').equals(id).delete();
   });
 }
 

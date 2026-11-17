@@ -1,6 +1,7 @@
 import type { FrameMessage } from '../engine/standalone';
 import { isGameStatus, type GameStatus } from '../engine/status';
 import type { GameSpec } from '../spec/schema';
+import { SaveStateSchema, type SaveState } from '../spec/saveState';
 import { buildGameHtml, loadEngineSource, type PlayOptions } from './gameHtml';
 
 export interface PlayerCallbacks {
@@ -16,6 +17,8 @@ export interface PlayerCallbacks {
 export class GamePlayer {
   private frame?: HTMLIFrameElement;
   private spec?: GameSpec;
+  private nextSnapshotId = 1;
+  private readonly snapshotWaiters = new Map<number, (state: SaveState | undefined) => void>();
 
   constructor(
     private readonly host: HTMLElement,
@@ -30,6 +33,11 @@ export class GamePlayer {
       else if (e.data.type === 'error') this.callbacks.onError(String(e.data.message));
       else if (e.data.type === 'status' && isGameStatus(e.data.status)) this.callbacks.onStatus?.(e.data.status);
       else if (e.data.type === 'shortcut' && e.data.name === 'palette') this.callbacks.onShortcut?.('palette');
+      else if (e.data.type === 'snapshot') {
+        // The frame is untrusted: validate before anything is stored.
+        this.snapshotWaiters.get(e.data.id)?.(SaveStateSchema.safeParse(e.data.state).data);
+        this.snapshotWaiters.delete(e.data.id);
+      }
     });
   }
 
@@ -37,8 +45,8 @@ export class GamePlayer {
     return this.spec !== undefined;
   }
 
-  async play(spec: GameSpec): Promise<void> {
-    const html = buildGameHtml(spec, await loadEngineSource(), this.playOptions());
+  async play(spec: GameSpec, extra: Partial<PlayOptions> = {}): Promise<void> {
+    const html = buildGameHtml(spec, await loadEngineSource(), { ...this.playOptions(), ...extra });
     this.stop();
     const frame = document.createElement('iframe');
     frame.setAttribute('sandbox', 'allow-scripts');
@@ -65,6 +73,25 @@ export class GamePlayer {
     this.host.replaceChildren(frame);
     this.frame = frame;
     this.spec = spec;
+  }
+
+  /** Ask the running game for a snapshot of the round in progress (undefined between rounds or on timeout). */
+  snapshot(timeoutMs = 1500): Promise<SaveState | undefined> {
+    const win = this.frame?.contentWindow;
+    if (!win) return Promise.resolve(undefined);
+    const id = this.nextSnapshotId++;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.snapshotWaiters.delete(id);
+        resolve(undefined);
+      }, timeoutMs);
+      this.snapshotWaiters.set(id, (state) => {
+        clearTimeout(timer);
+        resolve(state);
+      });
+      // The sandboxed frame has an opaque origin, so '*' is the only target that reaches it.
+      win.postMessage({ source: 'game-host', type: 'snapshot-request', id }, '*');
+    });
   }
 
   /** Start the current game from scratch by rebuilding its frame. */

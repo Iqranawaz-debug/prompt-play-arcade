@@ -2,12 +2,14 @@ import { ZodError } from 'zod';
 import { formatIssues } from '../spec/schema';
 import { runGame } from './index';
 import type { GameStatus } from './status';
+import type { SaveState } from '../spec/saveState';
+import type { GameHandle } from './index';
 
 declare global {
   interface Window {
     __GAME_SPEC__?: unknown;
     /** Optional player preferences injected by the dashboard (absent in exported files). */
-    __GAME_OPTIONS__?: { muted?: boolean; maxZoom?: number; keys?: unknown };
+    __GAME_OPTIONS__?: { muted?: boolean; maxZoom?: number; keys?: unknown; resume?: unknown };
   }
 }
 
@@ -16,7 +18,8 @@ type FrameEvent =
   | { type: 'ready' }
   | { type: 'error'; message: string }
   | { type: 'status'; status: GameStatus }
-  | { type: 'shortcut'; name: 'palette' };
+  | { type: 'shortcut'; name: 'palette' }
+  | { type: 'snapshot'; id: number; state: SaveState | null };
 export type FrameMessage = FrameEvent & { source: 'game-frame' };
 
 function post(msg: FrameEvent): void {
@@ -35,15 +38,26 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+let handle: GameHandle | undefined;
+// The dashboard asks for a snapshot when the player saves; only the embedding page may ask.
+window.addEventListener('message', (e: MessageEvent<{ source?: string; type?: string; id?: unknown }>) => {
+  if (e.source !== window.parent || e.data?.source !== 'game-host' || e.data.type !== 'snapshot-request' || typeof e.data.id !== 'number') return;
+  post({ type: 'snapshot', id: e.data.id, state: handle?.snapshot() ?? null });
+});
+
 const parent = document.getElementById('game')!;
 const prefs = window.__GAME_OPTIONS__ ?? {};
 runGame(window.__GAME_SPEC__, parent, {
   muted: prefs.muted === true,
   maxZoom: typeof prefs.maxZoom === 'number' ? prefs.maxZoom : undefined,
   keys: prefs.keys,
+  resume: prefs.resume,
   onStatus: (status) => post({ type: 'status', status }),
 })
-  .then(() => post({ type: 'ready' }))
+  .then((h) => {
+    handle = h;
+    post({ type: 'ready' });
+  })
   .catch((err: unknown) => {
     parent.textContent = describe(err);
     post({ type: 'error', message: describe(err) });

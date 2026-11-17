@@ -19,6 +19,8 @@ import { createPhysicsSettings } from './studio/physics';
 import { createAnimationStudio } from './studio/animation';
 import { createLevelEditor } from './studio/levelEditor';
 import { aiLevelPanel } from './studio/levelDesigner';
+import { createSavesDialog } from './savesDialog';
+import type { SaveState } from '../spec/saveState';
 import { createAssetStudio } from './studio/assets';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
 import { decodeSpec, sharedFromHash } from './share';
@@ -57,6 +59,7 @@ const stageTitle = $('stage-title');
 const stageError = $('stage-error');
 const restartBtn = $<HTMLButtonElement>('restart');
 const historyBtn = $<HTMLButtonElement>('history');
+const savesBtn = $<HTMLButtonElement>('saves');
 const shareBtn = $<HTMLButtonElement>('share');
 const sharedBanner = $('shared-banner');
 /** A game opened from a share link that is not (yet) in the library. */
@@ -173,6 +176,7 @@ const player = new GamePlayer(
 function syncStageButtons(): void {
   restartBtn.disabled = !player.loaded;
   historyBtn.disabled = !player.loaded || !activeId;
+  savesBtn.disabled = !player.loaded || !activeId;
   shareBtn.disabled = !player.loaded;
   sharedBanner.hidden = !sharedSpec || !player.loaded;
   const versions = allGames.find((g) => g.id === activeId)?.versions?.length ?? 0;
@@ -341,7 +345,7 @@ librarySearch.addEventListener('input', () => {
 });
 librarySort.addEventListener('change', () => setLibQuery({ sort: librarySort.value as LibrarySort }));
 
-async function play(game: SavedGame): Promise<void> {
+async function play(game: SavedGame, resume?: SaveState): Promise<void> {
   activeId = game.id;
   sharedSpec = undefined;
   setStageInfo(game);
@@ -354,7 +358,7 @@ async function play(game: SavedGame): Promise<void> {
     roundStartedAt = undefined;
     lastPhaseSeen = undefined;
     void showBest(game.id);
-    await player.play(game.spec);
+    await player.play(game.spec, { resume });
     // play() resolves once the frame is inserted, before the game inside it can report its first status.
     showGameStatus('loading');
   } catch (err) {
@@ -604,6 +608,8 @@ function commands(): Command[] {
       id: 'share', group: 'Current game', title: 'Share this game', hint: 'Link or file', keywords: 'link send copy portfolio export',
       disabled: !player.loaded, run: () => shareBtn.click(),
     },
+    { id: 'save-state', group: 'Current game', title: 'Save game state', hint: 'Keep this round', keywords: 'save progress checkpoint quicksave', disabled: !player.loaded || currentPhase !== 'playing', run: () => void savesTool.saveNow() },
+    { id: 'open-saves', group: 'Current game', title: 'Load a saved game', keywords: 'saves load resume continue checkpoint', disabled: !player.loaded || !activeId, run: () => void savesTool.open() },
     { id: 'restart', group: 'Current game', title: 'Restart game', keywords: 'reload again replay', disabled: !player.loaded, run: () => restartBtn.click() },
     { id: 'fullscreen', group: 'Current game', title: 'Toggle fullscreen', keywords: 'full screen expand', disabled: !player.loaded, run: () => fullscreenBtn.click() },
     ...allGames.map<Command>((g) => ({
@@ -718,6 +724,14 @@ createMenu($<HTMLButtonElement>('studio'), $('studio-menu'), studioItems);
 // ---------- Stats ----------
 const statsPanel = createStatsPanel($('overlays'), () => allGames);
 $('open-stats').addEventListener('click', () => void statsPanel.open());
+
+const savesTool = createSavesDialog($('overlays'), {
+  current: () => allGames.find((g) => g.id === activeId),
+  playing: () => currentPhase === 'playing',
+  snapshot: () => player.snapshot(),
+  resume: (game, state) => play(game, state),
+});
+savesBtn.addEventListener('click', () => void savesTool.open());
 
 historyBtn.addEventListener('click', () => {
   const game = allGames.find((g) => g.id === activeId);

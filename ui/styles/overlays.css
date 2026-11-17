@@ -403,3 +403,10 @@ button.asset-tile span:last-child { font-size: 10.5px; color: var(--text-3); fon
 .level-canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .gen-panel { display: grid; gap: var(--s-3); }
 .seed-field { flex: 0 0 120px; }
+
+/* Saves */
+.save-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.save-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); border: 1px solid var(--border); background: rgb(255 255 255 / 0.03); }
+.save-row.stale { opacity: 0.6; }
+.save-row .tool-actions { flex: none; }
+.save-row button { height: 30px; padding: 0 var(--s-3); font-size: var(--fs-xs); }
