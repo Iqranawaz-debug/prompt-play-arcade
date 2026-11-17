@@ -6,6 +6,8 @@ import type { GameStatus } from './status';
 declare global {
   interface Window {
     __GAME_SPEC__?: unknown;
+    /** Optional player preferences injected by the dashboard (absent in exported files). */
+    __GAME_OPTIONS__?: { muted?: boolean; maxZoom?: number };
   }
 }
 
@@ -23,7 +25,12 @@ const describe = (err: unknown) =>
 window.addEventListener('error', (e) => post({ type: 'error', message: e.message }));
 
 const parent = document.getElementById('game')!;
-runGame(window.__GAME_SPEC__, parent, { onStatus: (status) => post({ type: 'status', status }) })
+const prefs = window.__GAME_OPTIONS__ ?? {};
+runGame(window.__GAME_SPEC__, parent, {
+  muted: prefs.muted === true,
+  maxZoom: typeof prefs.maxZoom === 'number' ? prefs.maxZoom : undefined,
+  onStatus: (status) => post({ type: 'status', status }),
+})
   .then(() => post({ type: 'ready' }))
   .catch((err: unknown) => {
     parent.textContent = describe(err);

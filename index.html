@@ -30,8 +30,16 @@
           <span class="brand-tagline">Describe it. Play it.</span>
         </div>
       </div>
-      <span id="model-chip" class="pill">Checking server…</span>
+      <div class="top-actions">
+        <span id="model-chip" class="pill">Checking server…</span>
+        <button id="open-settings" type="button" class="icon-btn" aria-label="Customize" title="Customize">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" />
+          </svg>
+        </button>
+      </div>
     </header>
+    <div id="overlays"></div>
 
     <main class="layout">
       <aside class="sidebar" aria-label="Create and library">

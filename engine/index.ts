@@ -12,14 +12,20 @@ export { WORLD };
 export interface RunOptions {
   /** Called when the game's phase, score or lives change. */
   onStatus?: (status: GameStatus) => void;
+  /** Start with sound effects off (M still toggles). */
+  muted?: boolean;
+  /** Upper bound on render zoom; lower is lighter on the GPU. */
+  maxZoom?: number;
 }
 
 /** Validate a spec and start it inside `parent`. Throws if the spec is invalid. */
 export async function runGame(input: unknown, parent: HTMLElement, options: RunOptions = {}): Promise<Phaser.Game> {
   const spec = GameSpecSchema.parse(input);
   // Render with more real pixels than logical ones so the scaled-up game stays sharp (see renderZoom).
-  const zoom = renderZoom(parent.clientWidth || window.innerWidth, parent.clientHeight || window.innerHeight);
+  const zoom = Math.min(options.maxZoom ?? Infinity, renderZoom(parent.clientWidth || window.innerWidth, parent.clientHeight || window.innerHeight));
   setTextResolution(zoom);
+  const sfx = new SoundFx();
+  sfx.muted = Boolean(options.muted);
   const canvases = await rasterizeSprites(spec.sprites, Math.max(2, Math.ceil(zoom)));
   return new Phaser.Game({
     type: Phaser.AUTO,
@@ -31,6 +37,6 @@ export async function runGame(input: unknown, parent: HTMLElement, options: RunO
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     banner: false,
     audio: { noAudio: true }, // sounds come from our own Web Audio synth
-    scene: [new GameScene(spec, canvases, new SoundFx(), zoom, options.onStatus)],
+    scene: [new GameScene(spec, canvases, sfx, zoom, options.onStatus)],
   });
 }

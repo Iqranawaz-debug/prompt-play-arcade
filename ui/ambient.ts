@@ -3,6 +3,8 @@
  * Cheap by design: capped at 30fps, paused while the tab is hidden, a single still frame for reduced motion.
  */
 
+import { getSettings, motionReduced, onSettings } from './settings';
+
 interface Star {
   x: number;
   y: number;
@@ -19,7 +21,6 @@ const FRAME_MS = 1000 / 30;
 export function startAmbient(canvas: HTMLCanvasElement): () => void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return () => {};
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let stars: Star[] = [];
   let width = 0;
   let height = 0;
@@ -79,24 +80,24 @@ export function startAmbient(canvas: HTMLCanvasElement): () => void {
   const run = () => {
     cancelAnimationFrame(raf);
     last = 0;
-    if (reduceMotion.matches || document.hidden) draw(performance.now(), 0);
+    if (!getSettings().ambient) return; // hidden by Settings: draw nothing
+    if (motionReduced() || document.hidden) draw(performance.now(), 0);
     else raf = requestAnimationFrame(loop);
   };
 
   seed();
-  run();
   const onResize = () => {
     seed();
-    if (reduceMotion.matches) draw(performance.now(), 0);
+    if (motionReduced()) draw(performance.now(), 0);
   };
   window.addEventListener('resize', onResize);
   document.addEventListener('visibilitychange', run);
-  reduceMotion.addEventListener('change', run);
+  const unsubscribe = onSettings(run);
 
   return () => {
     cancelAnimationFrame(raf);
     window.removeEventListener('resize', onResize);
     document.removeEventListener('visibilitychange', run);
-    reduceMotion.removeEventListener('change', run);
+    unsubscribe();
   };
 }

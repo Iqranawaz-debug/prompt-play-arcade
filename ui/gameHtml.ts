@@ -6,11 +6,18 @@ const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-i
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/** Player preferences passed into the game frame (omitted from exports, which use defaults). */
+export interface PlayOptions {
+  muted?: boolean;
+  maxZoom?: number;
+}
+
 /** Build a complete, self-contained HTML document that runs `spec` with the bundled engine. */
-export function buildGameHtml(spec: GameSpec, engineSrc: string): string {
+export function buildGameHtml(spec: GameSpec, engineSrc: string, options?: PlayOptions): string {
   // Neither payload may close the <script> element it lives in.
   const specJson = JSON.stringify(spec).replace(/</g, '\\u003c');
   const engine = engineSrc.replace(/<\/script/gi, '<\\/script');
+  const opts = options ? `window.__GAME_OPTIONS__=${JSON.stringify({ muted: Boolean(options.muted), maxZoom: options.maxZoom })};` : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -22,7 +29,7 @@ export function buildGameHtml(spec: GameSpec, engineSrc: string): string {
 </head>
 <body>
 <div id="game"></div>
-<script>window.__GAME_SPEC__=${specJson};</script>
+<script>window.__GAME_SPEC__=${specJson};${opts}</script>
 <script>${engine}</script>
 </body>
 </html>

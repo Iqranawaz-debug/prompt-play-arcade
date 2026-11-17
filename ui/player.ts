@@ -1,7 +1,7 @@
 import type { FrameMessage } from '../engine/standalone';
 import { isGameStatus, type GameStatus } from '../engine/status';
 import type { GameSpec } from '../spec/schema';
-import { buildGameHtml, loadEngineSource } from './gameHtml';
+import { buildGameHtml, loadEngineSource, type PlayOptions } from './gameHtml';
 
 export interface PlayerCallbacks {
   onReady(): void;
@@ -18,6 +18,8 @@ export class GamePlayer {
   constructor(
     private readonly host: HTMLElement,
     private readonly callbacks: PlayerCallbacks,
+    /** Read on every play, so settings changes apply to the next game or restart. */
+    private readonly playOptions: () => PlayOptions = () => ({}),
   ) {
     window.addEventListener('message', (e: MessageEvent<FrameMessage>) => {
       // Only trust messages from the frame we created. Its origin is "null" because of the sandbox.
@@ -33,7 +35,7 @@ export class GamePlayer {
   }
 
   async play(spec: GameSpec): Promise<void> {
-    const html = buildGameHtml(spec, await loadEngineSource());
+    const html = buildGameHtml(spec, await loadEngineSource(), this.playOptions());
     this.stop();
     const frame = document.createElement('iframe');
     frame.setAttribute('sandbox', 'allow-scripts');

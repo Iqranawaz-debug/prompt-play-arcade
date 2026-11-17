@@ -1,11 +1,14 @@
 import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './db';
 import { exportGame } from './export';
 import { startAmbient } from './ambient';
+import { createSettingsDrawer } from './drawer';
+import { applySettings, getSettings, onSettings } from './settings';
 import { setButtonLabel } from './icons';
 import { renderLibrary } from './library';
 import { GamePlayer } from './player';
@@ -87,11 +90,15 @@ function showGameStatus(s: GameStatus | 'loading' | undefined): void {
   lastScore = s.score;
 }
 
-const player = new GamePlayer($('stage-frame'), {
-  onReady: () => showStageError(),
-  onError: (message) => showStageError(message),
-  onStatus: (s) => showGameStatus(s),
-});
+const player = new GamePlayer(
+  $('stage-frame'),
+  {
+    onReady: () => showStageError(),
+    onError: (message) => showStageError(message),
+    onStatus: (s) => showGameStatus(s),
+  },
+  () => ({ muted: !getSettings().gameSound, maxZoom: getSettings().previewQuality === 'balanced' ? 1.25 : undefined }),
+);
 
 /** Keep the preview chrome in step with the player: buttons, empty state, glow and heading. */
 function syncStageButtons(): void {
@@ -260,16 +267,32 @@ for (const chip of ideaChips) {
   });
 }
 
+applySettings();
+const settingsDrawer = createSettingsDrawer($('overlays'));
+$('open-settings').addEventListener('click', () => settingsDrawer.open());
+
 async function init(): Promise<void> {
   startAmbient($<HTMLCanvasElement>('ambient-stars'));
   // The 3D controller is code-split: Three.js loads in the background after the UI is up.
-  import('./controller3d')
-    .then(({ mountController }) => {
-      if (mountController($('empty-3d'))) $('empty-3d').parentElement!.classList.add('has-3d');
-    })
-    .catch(() => {
-      /* keep the SVG illustration */
-    });
+  // The 3D controller is code-split: Three.js loads in the background, only if enabled in Settings.
+  let unmount3d: (() => void) | undefined;
+  onSettings((s) => {
+    const holder = $('empty-3d');
+    if (s.controller3d && !unmount3d) {
+      unmount3d = () => {}; // reserve while loading
+      import('./controller3d')
+        .then(({ mountController }) => {
+          if (!getSettings().controller3d) return void (unmount3d = undefined);
+          unmount3d = mountController(holder);
+          holder.parentElement!.classList.toggle('has-3d', Boolean(unmount3d));
+        })
+        .catch(() => (unmount3d = undefined));
+    } else if (!s.controller3d && unmount3d) {
+      unmount3d();
+      unmount3d = undefined;
+      holder.parentElement!.classList.remove('has-3d');
+    }
+  });
   syncStageButtons();
   setStageInfo();
   updateCounter();

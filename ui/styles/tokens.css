@@ -22,15 +22,23 @@
   --accent: #ffb454;
   --accent-2: #ff8a3d;
   --accent-ink: #251605;
-  --accent-soft: rgb(255 180 84 / 0.14);
+  --accent-soft: rgb(var(--accent-rgb) / 0.14);
   --violet: #8f80f5;
   --violet-2: #6d7cf0;
-  --violet-soft: rgb(143 128 245 / 0.14);
+  --violet-soft: rgb(var(--violet-rgb) / 0.14);
   --blue: #5b8def;
   --success: #4ade80;
   --warning: #fbbf24;
   --danger: #f87171;
   --danger-soft: rgb(248 113 113 / 0.12);
+
+  /* Colour channels, so translucent tints follow the active theme */
+  --accent-hi: #ffc674;
+  --accent-rgb: 255 180 84;
+  --accent-2-rgb: 255 138 61;
+  --violet-rgb: 143 128 245;
+  --violet-2-rgb: 109 124 240;
+  --blue-rgb: 91 141 239;
 
   /* Shape */
   --r-sm: 8px;
@@ -67,7 +75,7 @@
   --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5);
   --highlight: inset 0 1px 0 rgb(255 255 255 / 0.05);
-  --ring: 0 0 0 3px rgb(255 180 84 / 0.35);
+  --ring: 0 0 0 3px rgb(var(--accent-rgb) / 0.35);
 
   /* Motion */
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -87,3 +95,26 @@
   /* A spinner that does not spin reads as broken, so keep it, slowly. */
   .spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
 }
+
+/* ---------- Themes (Settings -> Theme). Each one only redefines the accent tokens. ---------- */
+:root[data-theme='nebula'] {
+  --accent: #b9a3ff; --accent-2: #8b6cf6; --accent-hi: #d2c4ff; --accent-ink: #170f30;
+  --accent-rgb: 185 163 255; --accent-2-rgb: 139 108 246; --accent-soft: rgb(185 163 255 / 0.14);
+  --violet: #5ec8ff; --violet-2: #3a9ff0; --violet-rgb: 94 200 255; --violet-2-rgb: 58 159 240; --violet-soft: rgb(94 200 255 / 0.14);
+}
+:root[data-theme='ocean'] {
+  --accent: #5eead4; --accent-2: #22b8cf; --accent-hi: #a1f6e8; --accent-ink: #032420;
+  --accent-rgb: 94 234 212; --accent-2-rgb: 34 184 207; --accent-soft: rgb(94 234 212 / 0.14);
+}
+:root[data-theme='rose'] {
+  --accent: #ff8fa3; --accent-2: #f4537a; --accent-hi: #ffb7c4; --accent-ink: #2b0711;
+  --accent-rgb: 255 143 163; --accent-2-rgb: 244 83 122; --accent-soft: rgb(255 143 163 / 0.14);
+}
+
+/* Reduced motion chosen in Settings, regardless of the OS setting. */
+:root[data-motion='reduced'] *, :root[data-motion='reduced'] *::before, :root[data-motion='reduced'] *::after {
+  transition-duration: 0ms !important;
+  animation-duration: 0ms !important;
+  animation-iteration-count: 1 !important;
+}
+:root[data-motion='reduced'] .spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }

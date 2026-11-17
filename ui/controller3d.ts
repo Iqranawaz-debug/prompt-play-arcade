@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { motionReduced, onSettings } from './settings';
 
 /**
  * A small glossy 3D game controller that floats and slowly turns, for the empty preview state.
@@ -69,7 +70,6 @@ export function mountController(host: HTMLElement): (() => void) | undefined {
   area.addEventListener('pointermove', onPointer);
   area.addEventListener('pointerleave', onLeave);
 
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const clock = new THREE.Clock();
   let raf = 0;
   let visible = true;
@@ -94,7 +94,7 @@ export function mountController(host: HTMLElement): (() => void) | undefined {
     cancelAnimationFrame(raf);
     const shown = visible && !document.hidden && host.offsetParent !== null;
     if (!shown) return;
-    if (reduceMotion.matches) {
+    if (motionReduced()) {
       pose(0);
       renderer.render(scene, camera);
     } else {
@@ -113,15 +113,14 @@ export function mountController(host: HTMLElement): (() => void) | undefined {
   });
   ro.observe(host);
   document.addEventListener('visibilitychange', update);
-  reduceMotion.addEventListener('change', update);
-  update();
+  const unsubscribe = onSettings(update);
 
   return () => {
     cancelAnimationFrame(raf);
     io.disconnect();
     ro.disconnect();
     document.removeEventListener('visibilitychange', update);
-    reduceMotion.removeEventListener('change', update);
+    unsubscribe();
     area.removeEventListener('pointermove', onPointer);
     area.removeEventListener('pointerleave', onLeave);
     scene.traverse((o) => {

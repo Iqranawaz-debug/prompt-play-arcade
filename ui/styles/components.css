@@ -20,10 +20,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Premium primary: glossy gradient, top reflection, light sweep on hover, lift and glow. */
 button.primary {
-  --btn-a: #ffc674;
+  --btn-a: var(--accent-hi);
   --btn-b: var(--accent);
   --btn-c: var(--accent-2);
-  --btn-glow: 255 138 61;
+  --btn-glow: var(--accent-2-rgb);
   position: relative; overflow: hidden; isolation: isolate;
   color: var(--accent-ink); border-color: transparent; font-weight: 650;
   background: linear-gradient(180deg, var(--btn-a) 0%, var(--btn-b) 48%, var(--btn-c) 100%);
@@ -92,7 +92,7 @@ button.btn-md { height: var(--h-md); }
   box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.35);
   transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease);
 }
-.prompt-field:focus-within { border-color: rgb(255 180 84 / 0.6); box-shadow: var(--ring), inset 0 1px 3px rgb(0 0 0 / 0.35); }
+.prompt-field:focus-within { border-color: rgb(var(--accent-rgb) / 0.6); box-shadow: var(--ring), inset 0 1px 3px rgb(0 0 0 / 0.35); }
 .prompt-field textarea {
   display: block; width: 100%; min-height: 84px; max-height: 160px; resize: vertical;
   padding: var(--s-3) var(--s-3) var(--s-1); border: 0; outline: none; background: transparent;
@@ -111,14 +111,14 @@ kbd {
 }
 #generate { width: 100%; margin-top: var(--s-3); }
 #generate .icon { width: 18px; height: 18px; }
-.composer.remixing #generate { --btn-a: #b3a8fb; --btn-b: var(--violet); --btn-c: var(--violet-2); --btn-glow: 109 124 240; color: #fff; }
+.composer.remixing #generate { --btn-a: #b3a8fb; --btn-b: var(--violet); --btn-c: var(--violet-2); --btn-glow: var(--violet-2-rgb); color: #fff; }
 /* Once there is a prompt to send, Generate breathes a soft glow to invite the click. */
 .composer.has-prompt #generate:not(:disabled):not(:hover) { animation: breathe 2.8s ease-in-out infinite; }
 @keyframes breathe {
   0%, 100% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), inset 0 -2px 0 rgb(0 0 0 / 0.12), 0 4px 14px rgb(var(--btn-glow) / 0.28); }
   50% { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), inset 0 -2px 0 rgb(0 0 0 / 0.12), 0 6px 26px rgb(var(--btn-glow) / 0.5); }
 }
-.composer.remixing .prompt-field:focus-within { border-color: rgb(143 128 245 / 0.6); box-shadow: 0 0 0 3px rgb(143 128 245 / 0.3); }
+.composer.remixing .prompt-field:focus-within { border-color: rgb(var(--violet-rgb) / 0.6); box-shadow: 0 0 0 3px rgb(var(--violet-rgb) / 0.3); }
 .note { margin-top: var(--s-2); font-size: var(--fs-xs); color: var(--text-2); min-height: 0; }
 .note:empty { display: none; }
 
@@ -126,7 +126,7 @@ kbd {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
   margin-bottom: var(--s-3); padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
   border-radius: var(--r-md); font-size: var(--fs-sm); color: #d9d4ff;
-  background: var(--violet-soft); border: 1px solid rgb(143 128 245 / 0.4);
+  background: var(--violet-soft); border: 1px solid rgb(var(--violet-rgb) / 0.4);
 }
 .remix-banner span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .remix-banner button { height: 28px; font-size: var(--fs-xs); }
@@ -134,8 +134,8 @@ kbd {
 /* ---------- Live generation status ---------- */
 .status-box {
   display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3); padding: var(--s-3);
-  border-radius: var(--r-md); border: 1px solid rgb(255 180 84 / 0.55);
-  background: linear-gradient(135deg, rgb(255 180 84 / 0.12), rgb(255 180 84 / 0.04));
+  border-radius: var(--r-md); border: 1px solid rgb(var(--accent-rgb) / 0.55);
+  background: linear-gradient(135deg, rgb(var(--accent-rgb) / 0.12), rgb(var(--accent-rgb) / 0.04));
   animation: rise var(--t) var(--ease);
 }
 .status-text { display: grid; min-width: 0; flex: 1; }
@@ -143,7 +143,7 @@ kbd {
 .status-text span { font-size: var(--fs-xs); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spinner {
   flex: none; width: 18px; height: 18px; border-radius: 50%;
-  border: 2.5px solid rgb(255 180 84 / 0.25); border-top-color: var(--accent); animation: spin 0.8s linear infinite;
+  border: 2.5px solid rgb(var(--accent-rgb) / 0.25); border-top-color: var(--accent); animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
@@ -179,9 +179,9 @@ kbd {
 }
 .game:hover { background: var(--surface-2); border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .game.active {
-  border-color: rgb(255 180 84 / 0.7);
-  background: linear-gradient(135deg, rgb(255 180 84 / 0.12), rgb(255 180 84 / 0.03)), var(--surface-1);
-  box-shadow: 0 0 0 1px rgb(255 180 84 / 0.25), var(--shadow-md);
+  border-color: rgb(var(--accent-rgb) / 0.7);
+  background: linear-gradient(135deg, rgb(var(--accent-rgb) / 0.12), rgb(var(--accent-rgb) / 0.03)), var(--surface-1);
+  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.25), var(--shadow-md);
 }
 /* 3D-style cover built from the game's own sprites and colours (ui/cover.ts). */
 .game-cover {
@@ -258,7 +258,7 @@ kbd {
 .empty-state p { font-size: var(--fs-md); color: var(--text-2); }
 .idea-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); margin-top: var(--s-2); }
 .idea-chips button { height: 30px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 500; color: var(--text-2); background: rgb(255 255 255 / 0.04); }
-.idea-chips button:hover:not(:disabled) { color: var(--text); border-color: rgb(255 180 84 / 0.5); background: var(--accent-soft); }
+.idea-chips button:hover:not(:disabled) { color: var(--text); border-color: rgb(var(--accent-rgb) / 0.5); background: var(--accent-soft); }
 
 /* ---------- Gaming HUD elements in the dashboard ---------- */
 @keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--pulse) / 0.55); } 100% { box-shadow: 0 0 0 7px rgb(var(--pulse) / 0); } }
@@ -281,7 +281,7 @@ kbd {
 .live-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .live-status[data-phase='loading'] { color: var(--blue); }
 .live-status[data-phase='loading']::before { animation: blink 0.9s ease-in-out infinite; }
-.live-status[data-phase='intro'] { color: #93b4f5; background: rgb(91 141 239 / 0.12); border-color: rgb(91 141 239 / 0.35); }
+.live-status[data-phase='intro'] { color: #93b4f5; background: rgb(var(--blue-rgb) / 0.12); border-color: rgb(var(--blue-rgb) / 0.35); }
 .live-status[data-phase='playing'] { color: var(--success); background: rgb(74 222 128 / 0.1); border-color: rgb(74 222 128 / 0.35); }
 .live-status[data-phase='playing']::before { --pulse: 74 222 128; animation: live-pulse 1.6s ease-out infinite; }
 .live-status[data-phase='won'] { color: var(--success); background: rgb(74 222 128 / 0.12); border-color: rgb(74 222 128 / 0.4); }
@@ -310,7 +310,7 @@ kbd {
 
 /* Generation progress bar along the bottom of the status box. */
 .status-box { position: relative; overflow: hidden; }
-.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(255 180 84 / 0.14); }
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(var(--accent-rgb) / 0.14); }
 .progress-fill {
   position: relative; display: block; height: 100%; width: 0; overflow: hidden;
   background: linear-gradient(90deg, var(--accent-2), var(--accent)); box-shadow: 0 0 10px rgb(255 160 70 / 0.7);

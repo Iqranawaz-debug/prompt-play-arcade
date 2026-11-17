@@ -1,0 +1,75 @@
+/* Header actions, scrim, drawers, popovers and dialogs. */
+
+/* Holds only fixed-position panels, so it must not take a row in the page grid. */
+#overlays { display: contents; }
+
+.top-actions { display: flex; align-items: center; gap: var(--s-2); }
+button.icon-btn {
+  width: var(--h-md); height: var(--h-md); padding: 0; border-radius: var(--r-md); position: relative;
+  color: var(--text-2); border-color: rgb(255 255 255 / 0.1);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+button.icon-btn:hover:not(:disabled) { color: var(--text); }
+button.icon-btn[aria-expanded='true'] { color: var(--text); border-color: rgb(var(--accent-rgb) / 0.5); }
+button.icon-btn .icon { width: 18px; height: 18px; }
+
+.scrim {
+  position: fixed; inset: 0; z-index: 40; background: rgb(4 6 10 / 0.55); backdrop-filter: blur(3px);
+  animation: fade-in var(--t) var(--ease);
+}
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0; } }
+@keyframes pop-in { from { transform: translateY(-6px) scale(0.98); opacity: 0; } }
+
+/* ---------- Settings drawer ---------- */
+.drawer {
+  position: fixed; z-index: 41; top: var(--s-3); right: var(--s-3); bottom: var(--s-3);
+  width: min(380px, calc(100vw - 2 * var(--s-3)));
+  display: flex; flex-direction: column; animation: slide-in 260ms var(--ease);
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02) 45%), rgb(16 22 35 / 0.9);
+}
+.drawer-head, .drawer-foot { display: flex; align-items: center; justify-content: space-between; padding: var(--s-4) var(--s-5); }
+.drawer-head { border-bottom: 1px solid var(--border); }
+.drawer-head h2 { font-size: var(--fs-lg); }
+.drawer-foot { border-top: 1px solid var(--border); font-size: var(--fs-xs); }
+.drawer-body { flex: 1; overflow-y: auto; padding: var(--s-2) var(--s-5) var(--s-5); scrollbar-width: thin; }
+.drawer-section { padding: var(--s-4) 0; border-bottom: 1px solid var(--border); }
+.drawer-section:last-child { border-bottom: 0; }
+.drawer-section h3 { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: var(--s-3); }
+.muted { color: var(--text-3); }
+
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); padding: var(--s-2) 0; }
+.setting-row.stacked { flex-direction: column; align-items: stretch; gap: var(--s-2); }
+.setting-text { display: grid; gap: 2px; min-width: 0; }
+.setting-text strong { font-size: var(--fs-sm); font-weight: 600; }
+.setting-text span { font-size: var(--fs-xs); color: var(--text-3); }
+
+button.switch {
+  flex: none; width: 40px; height: 22px; padding: 2px; border-radius: var(--r-pill); justify-content: flex-start;
+  background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.12);
+}
+button.switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform var(--t) var(--ease); }
+button.switch[aria-checked='true'] { background: linear-gradient(180deg, var(--accent), var(--accent-2)); border-color: transparent; }
+button.switch[aria-checked='true'] .knob { transform: translateX(18px); }
+
+.segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 3px; gap: 3px; border-radius: var(--r-md); background: var(--surface-sunken); border: 1px solid var(--border); }
+.segmented button { height: 30px; border: 0; background: transparent; color: var(--text-2); font-size: var(--fs-xs); }
+.segmented button[aria-checked='true'] { color: var(--text); background: rgb(255 255 255 / 0.1); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), var(--shadow-sm); }
+
+.theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
+button.theme-option {
+  height: auto; flex-direction: column; gap: 6px; padding: var(--s-2); border-radius: var(--r-md);
+  font-size: var(--fs-xs); color: var(--text-2); background: rgb(255 255 255 / 0.03);
+}
+button.theme-option[aria-checked='true'] { color: var(--text); border-color: rgb(var(--accent-rgb) / 0.7); background: var(--accent-soft); }
+.theme-swatch { width: 100%; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--sw-a), var(--sw-b)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3); }
+
+/* Settings-driven visibility */
+.no-ambient .ambient { display: none; }
+.no-hints .stage-hint { visibility: hidden; }
+.no-glow .frame-wrap::before { opacity: 0; }
+
+@media (max-width: 860px) {
+  .top-actions .pill { display: none; }
+}
