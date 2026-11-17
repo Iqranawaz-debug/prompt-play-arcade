@@ -77,6 +77,13 @@ export class Controls {
     return { x, y };
   }
 
+  /** Platformer jump: up, the start key (Space), gamepad A or D-pad up, or the stick pushed up. */
+  jumpHeld(): boolean {
+    if (this.isHeld('up') || this.isHeld('start')) return true;
+    const pad = this.pad();
+    return Boolean(pad && (pad.buttons[0]?.pressed || pad.buttons[12]?.pressed || (pad.axes[1] ?? 0) < -0.6));
+  }
+
   private pad(): Gamepad | undefined {
     try {
       return navigator.getGamepads?.().find((p): p is Gamepad => Boolean(p?.connected));

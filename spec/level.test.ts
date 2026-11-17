@@ -67,3 +67,10 @@ describe('platformer specs', () => {
     expect(GameSpecSchema.safeParse({ ...platformer(), spawns: s.spawns }).success).toBe(true);
   });
 });
+
+describe('lanternHop example', () => {
+  it('is a valid platformer', async () => {
+    const { lanternHop } = await import('./examples/lanternHop');
+    expect(GameSpecSchema.safeParse(lanternHop).error?.issues ?? []).toEqual([]);
+  });
+});

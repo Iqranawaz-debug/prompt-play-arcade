@@ -39,3 +39,9 @@ export function shade(hex: string, amount: number): string {
   const mixed = hexToRgb(hex).map((c) => Math.round(c + (target - c) * t));
   return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
+
+/** Blend two colours: t = 0 gives `a`, 1 gives `b`. */
+export function mix(a: string, b: string, t: number): string {
+  const [x, y] = [hexToRgb(a), hexToRgb(b)];
+  return `#${x.map((c, i) => Math.round(c + (y[i] - c) * t).toString(16).padStart(2, '0')).join('')}`;
+}

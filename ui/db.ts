@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
+import { lanternHop } from '../spec/examples/lanternHop';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
 import { guessGenre, type Genre } from './genre';
 
@@ -142,9 +143,20 @@ export async function clearStats(): Promise<void> {
   await db.plays.clear();
 }
 
-/** Put the two hand-written examples in an empty library so there is something to play offline. */
+const PLATFORMER_SEEN = 'gg.seed.platformer';
+
+/** Put the hand-written examples in an empty library so there is something to play offline. */
 export async function seedIfEmpty(): Promise<void> {
-  if ((await db.games.count()) > 0) return;
-  await addGame('A cozy fishing game where the fish are tiny philosophers', GameSpecSchema.parse(philosopherFishing));
-  await addGame('Deliver parcels in space while dodging comets', GameSpecSchema.parse(cometCourier));
+  if ((await db.games.count()) === 0) {
+    await addGame('A cozy fishing game where the fish are tiny philosophers', GameSpecSchema.parse(philosopherFishing));
+    await addGame('Deliver parcels in space while dodging comets', GameSpecSchema.parse(cometCourier));
+  }
+  // Existing libraries get the platformer sample once, when platformers arrive.
+  try {
+    if (localStorage.getItem(PLATFORMER_SEEN)) return;
+    localStorage.setItem(PLATFORMER_SEEN, '1');
+  } catch {
+    return;
+  }
+  await addGame('A lantern spirit hops across mossy ledges collecting fireflies', GameSpecSchema.parse(lanternHop));
 }

@@ -6,6 +6,7 @@ import { Music } from './music';
 import { keyLabel } from '../spec/controls';
 import type { GameStatus } from './status';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
+import { atLedge, buildLevel, inWall, liftOutOfWalls, type Level } from './level';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, popScore, quoteBubble, showOverlay, toast, type HudState } from './ui';
 import { FIELD, WORLD } from './world';
@@ -22,6 +23,9 @@ interface EntityState {
 
 
 const HIT_COOLDOWN_MS = 800;
+/** Platformer forgiveness: jump this long after running off a ledge, or pressed this long before landing. */
+const COYOTE_MS = 100;
+const JUMP_BUFFER_MS = 120;
 const INVULNERABLE_MS = 1200;
 
 /** Runs any validated GameSpec. All game rules come from the spec; nothing here is game-specific. */
@@ -41,6 +45,10 @@ export class GameScene extends Phaser.Scene {
   private elapsedMs = 0;
   private readonly music: Music;
   private invulnerableUntil = 0;
+  private level?: Level;
+  private groundedAt = -Infinity;
+  private jumpPressedAt = -Infinity;
+  private jumpWasHeld = true;
 
   constructor(
     private readonly spec: GameSpec,
@@ -78,19 +86,30 @@ export class GameScene extends Phaser.Scene {
     this.lives = spec.player.lives;
     this.elapsedMs = 0;
     this.invulnerableUntil = 0;
+    this.groundedAt = this.jumpPressedAt = -Infinity;
+    this.jumpWasHeld = true;
 
     registerTextures(this, this.canvases);
     this.cameras.main.setBackgroundColor(spec.theme.background).setZoom(this.zoom).centerOn(WORLD.width / 2, WORLD.height / 2);
     // The player and walls live in the field below the HUD bar, so the HUD never covers gameplay.
     this.physics.world.setBounds(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
 
-    const start = { x: FIELD.x + spec.player.start.x * FIELD.w, y: FIELD.y + spec.player.start.y * FIELD.h };
+    this.level = buildLevel(this, spec);
+
+    const def = spec.sprites[spec.player.sprite];
+    let start = this.level?.start ?? { x: FIELD.x + spec.player.start.x * FIELD.w, y: FIELD.y + spec.player.start.y * FIELD.h };
+    if (this.level) start = liftOutOfWalls(this.level, start, def.height / 2);
     this.player = this.physics.add.image(start.x, start.y, texKey(spec.player.sprite));
-    sizeSprite(this.player, spec.sprites[spec.player.sprite]);
+    sizeSprite(this.player, def);
     this.player.setCollideWorldBounds(true).setDepth(10);
+    if (this.platformer) this.player.body.setGravityY(this.gravity);
 
     this.entities = this.physics.add.group();
     this.physics.add.overlap(this.player, this.entities, (_p, e) => this.onTouch(e as Body));
+    if (this.level) {
+      this.physics.add.collider(this.player, this.level.walls);
+      this.physics.add.collider(this.entities, this.level.walls);
+    }
 
     this.hud = new Hud(this, spec.theme, spec.score.label);
     this.refreshHud();
@@ -105,8 +124,17 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  private get platformer(): boolean {
+    return this.spec.player.controls === 'platformer';
+  }
+
+  private get gravity(): number {
+    return this.spec.physics?.gravity ?? 0;
+  }
+
   private startRound(): void {
     this.phase = 'playing';
+    this.jumpWasHeld = true; // the Space press that started the round is not a jump
     this.reportStatus();
     this.physics.resume();
     this.sfx.unlock();
@@ -128,7 +156,14 @@ export class GameScene extends Phaser.Scene {
     if (alive >= rule.maxAlive) return;
 
     const def = this.spec.sprites[spec.sprite];
-    const { pos, dir } = placeSpawn(rule.edge, { w: def.width, h: def.height }, FIELD, this.player);
+    const size = { w: def.width, h: def.height };
+    const others = this.entities.getChildren() as Body[];
+    const tops = this.level?.tops.filter((t) => !others.some((o) => Math.abs(o.x - t.x) < 30 && Math.abs(o.y - t.y) < 60));
+    let { pos, dir } = placeSpawn(rule.edge, size, FIELD, this.player, Math.random, tops?.length ? tops : this.level?.tops);
+    if (this.level && rule.edge === 'anywhere') {
+      for (let i = 0; i < 8 && inWall(this.level, pos); i++) ({ pos, dir } = placeSpawn(rule.edge, size, FIELD, this.player));
+      pos = liftOutOfWalls(this.level, pos, def.height / 2);
+    }
     if (spec.behavior === 'static') {
       // Static entities must sit inside the field to be reachable.
       pos.x = Phaser.Math.Clamp(pos.x, FIELD.x + def.width, FIELD.x + FIELD.w - def.width);
@@ -138,13 +173,15 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.entities.create(pos.x, pos.y, texKey(spec.sprite)) as Body;
     sizeSprite(sprite, def);
     this.state.set(sprite, { spec, mover: newMover(dir, spec.behavior), entered: false, cooldownUntil: 0 });
+    if (this.walker(spec)) sprite.body.setGravityY(this.gravity);
   }
 
   update(_time: number, delta: number): void {
     this.controls.poll(); // gamepad buttons work on the start and end cards too
     if (this.phase !== 'playing') return;
     this.elapsedMs += delta;
-    this.movePlayer();
+    if (this.platformer) this.movePlatformer(delta);
+    else this.movePlayer();
     for (const child of [...this.entities.getChildren()]) this.moveEntity(child as Body, delta);
 
     if (this.spec.score.perSecond > 0) {
@@ -179,20 +216,75 @@ export class GameScene extends Phaser.Scene {
     this.face(player, spec.player.sprite, dx);
   }
 
+  /** Run left/right with friction smoothing; jump when on the ground (with coyote time and a jump buffer). */
+  private movePlatformer(delta: number): void {
+    const { player, spec } = this;
+    const body = player.body;
+    const physics = spec.physics!;
+    const now = this.time.now;
+    let dx = this.controls.axis().x;
+    let jump = this.controls.jumpHeld();
+    const pointer = this.input.activePointer;
+    if (dx === 0 && pointer.isDown) {
+      const off = pointer.worldX - player.x;
+      dx = Math.abs(off) < 10 ? 0 : Math.sign(off) * Math.min(1, Math.abs(off) / 48);
+      if (pointer.worldY < player.y - player.displayHeight) jump = true;
+    }
+
+    const friction = Math.min(0.95, physics.friction);
+    const blend = friction === 0 ? 1 : 1 - friction ** (delta / 16.67);
+    const target = dx * spec.player.speed;
+    player.setVelocityX(body.velocity.x + (target - body.velocity.x) * blend);
+
+    if (body.blocked.down || body.touching.down) this.groundedAt = now;
+    if (jump && !this.jumpWasHeld) this.jumpPressedAt = now;
+    if (now - this.jumpPressedAt < JUMP_BUFFER_MS && now - this.groundedAt < COYOTE_MS) {
+      player.setVelocityY(-physics.jump);
+      this.groundedAt = this.jumpPressedAt = -Infinity;
+      this.sfx.play('jump');
+    }
+    // Letting go early makes a shorter hop.
+    if (!jump && body.velocity.y < -physics.jump * 0.45) player.setVelocityY(body.velocity.y * 0.6);
+    this.jumpWasHeld = jump;
+    this.face(player, spec.player.sprite, dx);
+  }
+
+  /** Patrolling entities in a game with gravity walk on platforms instead of floating. */
+  private walker(spec: EntitySpec): boolean {
+    return spec.behavior === 'patrol' && this.gravity > 0;
+  }
+
   private moveEntity(sprite: Body, delta: number): void {
     const s = this.state.get(sprite);
     if (!s) return;
     const half = { w: sprite.displayWidth / 2, h: sprite.displayHeight / 2 };
+    const body = sprite.body;
+    const walker = this.walker(s.spec);
+
+    if (!s.entered && isInside(sprite, half, FIELD)) {
+      s.entered = true;
+      if (walker) sprite.setCollideWorldBounds(true);
+    }
+    // Turn around at level walls (and, for walkers, at platform edges).
+    if (s.entered && !s.mover.leaving) {
+      const d = s.mover.dir;
+      if ((body.blocked.left && d.x < 0) || (body.blocked.right && d.x > 0)) d.x = -d.x;
+      if (!walker && ((body.blocked.up && d.y < 0) || (body.blocked.down && d.y > 0))) d.y = -d.y;
+    }
+    if (walker && body.blocked.down && atLedge(this.level, sprite.x, body.bottom, body.halfWidth, Math.sign(s.mover.dir.x))) {
+      s.mover.dir.x = -s.mover.dir.x;
+    }
 
     let vel = steer(s.spec.behavior, s.mover, sprite, this.player, s.spec.speed, delta);
-    if (!s.entered && isInside(sprite, half, FIELD)) s.entered = true;
     if (s.entered && !s.mover.leaving && CONTAINED.has(s.spec.behavior)) {
       vel = bounceOffWalls(s.mover, vel, sprite, half, FIELD);
     }
-    sprite.setVelocity(vel.x, vel.y);
+    if (walker) sprite.setVelocityX(vel.x);
+    else sprite.setVelocity(vel.x, vel.y);
     this.face(sprite, s.spec.sprite, vel.x);
 
-    if (isFarOutside(sprite, half, FIELD) && (s.entered || s.mover.ageMs > 4000)) sprite.destroy();
+    const stuck = !s.entered && s.mover.ageMs > 6000; // e.g. spawned behind a wall at the field edge
+    if (stuck || (isFarOutside(sprite, half, FIELD) && (s.entered || s.mover.ageMs > 4000))) sprite.destroy();
   }
 
   /** Mirror a sprite so it faces its direction of travel. */

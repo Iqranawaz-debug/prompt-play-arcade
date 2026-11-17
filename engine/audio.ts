@@ -1,6 +1,6 @@
 import type { EntitySpec } from '../spec/schema';
 
-export type SoundName = 'pickup' | 'big' | 'hurt' | 'heal' | 'pop' | 'start' | 'win' | 'lose';
+export type SoundName = 'pickup' | 'big' | 'hurt' | 'heal' | 'pop' | 'start' | 'win' | 'lose' | 'jump';
 
 interface Note {
   /** Start frequency (Hz), optional glide target, start offset and duration (s). */
@@ -28,6 +28,7 @@ const SOUNDS: Record<SoundName, Note[]> = {
   start: seq([523, 784], 0.1, 0.18, 'triangle'),
   win: seq([523, 659, 784, 1047, 784, 1047], 0.11, 0.18, 'square'),
   lose: seq([392, 330, 262, 196], 0.16, 0.25, 'triangle'),
+  jump: [{ f: 300, to: 620, t: 0, d: 0.12, type: 'square', v: 0.45 }],
 };
 
 /** Pick the sound for a collision: explicit `sfx` wins, otherwise derive it from the effect. */
