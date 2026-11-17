@@ -1,7 +1,7 @@
 import type { GameSpec } from '../spec/schema';
 import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { lintSpec } from '../spec/lint';
-import { CharacterSchema, DebugResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
+import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 import { askJson } from './ask';
 import { SPRITE_RULES, jsonSchema } from './prompt';
 import type { ChatProvider } from './providers';
@@ -85,4 +85,27 @@ Reply with JSON only: {"sprite":{"svg","width","height","faces"}}`,
     user: `Current sprite:\n${JSON.stringify(sprite)}\n\nChange requested:\n"""${change}"""`,
   });
   return result.sprite;
+}
+
+// ---------- Animation frames (Animation Studio) ----------
+export async function animateSprite(
+  provider: ChatProvider,
+  sprite: GameSpec['sprites'][string],
+  motion: string,
+  count: number,
+  background: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const result = await askJson(provider, {
+    schema: FramesResultSchema,
+    signal,
+    system: `You animate one sprite for a 2D game by drawing extra frames. The game cycles the original drawing and your
+frames in order, so each frame must be the SAME character: same viewBox, colours, size and position, changing only
+what the motion needs (legs, wings, arms, tail, flame, eyes). Small changes read best at sprite size.
+The game background is ${background}.
+${SPRITE_RULES}
+Reply with JSON only: {"frames":["<svg ...>...</svg>", ...]} with exactly ${count} frame(s).`,
+    user: `Original sprite:\n${JSON.stringify({ svg: sprite.svg, width: sprite.width, height: sprite.height })}\n\nMotion to animate:\n"""${motion}"""`,
+  });
+  return result.frames.slice(0, count);
 }

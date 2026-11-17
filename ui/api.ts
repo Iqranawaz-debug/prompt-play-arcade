@@ -2,7 +2,7 @@ import type { GenerateEvent, GenerateProgress } from '../generator/generate';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
 import { z } from 'zod';
-import { CharacterSchema, DebugResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
+import { CharacterSchema, DebugResultSchema, FramesResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 
 export interface Health {
   ok: boolean;
@@ -121,3 +121,6 @@ export const fetchDebug = (spec: GameSpec, problem: string, signal?: AbortSignal
 
 export const fetchSprite = (sprite: GameSpec['sprites'][string], change: string, background: string, signal?: AbortSignal) =>
   postTool('/api/sprite', { sprite, change, background }, SpriteResultSchema, 'Could not redraw the sprite', signal).then((r) => r.sprite);
+
+export const fetchFrames = (sprite: GameSpec['sprites'][string], motion: string, count: number, background: string, signal?: AbortSignal) =>
+  postTool('/api/frames', { sprite, motion, count, background }, FramesResultSchema, 'Could not animate the sprite', signal).then((r) => r.frames);

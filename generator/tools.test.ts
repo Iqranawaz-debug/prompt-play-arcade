@@ -5,7 +5,7 @@ import { GameSpecSchema } from '../spec/schema';
 import { environmentHints, lintSpec } from '../spec/lint';
 import { CharacterSchema, DebugResultSchema, StoryboardSchema, storyboardToPrompt, type Storyboard } from '../spec/tools';
 import { askJson } from './ask';
-import { debugGame, makeCharacter } from './tools';
+import { animateSprite, debugGame, makeCharacter } from './tools';
 import type { ChatMessage, ChatProvider } from './providers';
 
 function fake(replies: string[]) {
@@ -126,5 +126,20 @@ describe('diffValues', () => {
     fixed.spawns[1].everyMs = 1400;
     expect(diffValues(comet, fixed)).toEqual(['player.controls: "horizontal" -> "free"', 'spawns[1].everyMs: 900 -> 1400']);
     expect(diffValues(comet, comet)).toEqual([]);
+  });
+});
+
+describe('animateSprite', () => {
+  it('returns validated frames and retries unsafe ones', async () => {
+    const sprite = comet.sprites.rocket;
+    const ok = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="10"/></svg>';
+    const { provider, calls } = fake([
+      JSON.stringify({ frames: ['<svg><script>x</script></svg>'] }),
+      JSON.stringify({ frames: [ok, ok, ok] }),
+    ]);
+    const frames = await animateSprite(provider, sprite, 'flame flickers', 2, '#000000');
+    expect(frames).toEqual([ok, ok]);
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].content).toContain('exactly 2 frame(s)');
   });
 });

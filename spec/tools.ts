@@ -83,3 +83,8 @@ export type DebugResult = z.infer<typeof DebugResultSchema>;
 
 // ---------- Sprite redraw ----------
 export const SpriteResultSchema = z.object({ sprite: SpriteSchema });
+
+// ---------- Animation frames ----------
+export const FramesResultSchema = z.object({
+  frames: SpriteSchema.shape.frames.unwrap().min(1).describe('Extra frames, same viewBox and size as the original'),
+});

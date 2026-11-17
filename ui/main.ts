@@ -16,6 +16,7 @@ import { createCharacterCreator } from './studio/character';
 import { createDebugger } from './studio/debugger';
 import { createSoundDesigner } from './studio/sound';
 import { createPhysicsSettings } from './studio/physics';
+import { createAnimationStudio } from './studio/animation';
 import { createAssetStudio } from './studio/assets';
 import { STUDIO_ICONS, createMenu, type MenuItem } from './menu';
 import { decodeSpec, sharedFromHash } from './share';
@@ -566,6 +567,7 @@ function commands(): Command[] {
       run: () => setLibQuery({ filter: 'recent' }),
     },
     { id: 'assets', group: 'Studio', title: 'Asset Studio', keywords: 'sprites colours colors theme images art redraw upload svg', disabled: !current, run: () => assetTool.open() },
+    { id: 'animation-studio', group: 'Studio', title: 'Animation Studio', keywords: 'animate frames motion sprite bob walk', disabled: !current, run: () => animationTool.open() },
     { id: 'physics-settings', group: 'Studio', title: 'Physics Settings', keywords: 'gravity jump platformer movement speed friction', disabled: !current, run: () => physicsTool.open() },
     { id: 'sound-designer', group: 'Studio', title: 'Sound Designer', keywords: 'music audio sfx soundtrack effects', disabled: !current, run: () => soundTool.open() },
     { id: 'debug', group: 'Studio', title: 'Debug this game', keywords: 'bug problem broken fix help not working', disabled: !current, run: () => debugTool.open() },
@@ -694,12 +696,14 @@ const debugTool = createDebugger($('overlays'), studio);
 const soundTool = createSoundDesigner($('overlays'), studio);
 const assetTool = createAssetStudio($('overlays'), studio);
 const physicsTool = createPhysicsSettings($('overlays'), studio);
+const animationTool = createAnimationStudio($('overlays'), studio);
 const noGame = () => !studio.current();
 
 /** Studio menu entries; later tools add themselves here. */
 const studioItems: MenuItem[] = [
   { label: 'Character Creator', hint: 'Describe a hero; get a sprite and stats', icon: STUDIO_ICONS.character, run: () => characterTool.open() },
   { label: 'Asset Studio', hint: 'Colours and sprites: resize, redraw, upload', icon: STUDIO_ICONS.assets, run: () => assetTool.open(), disabled: noGame },
+  { label: 'Animation Studio', hint: 'Idle and move motions, AI-drawn frames', icon: STUDIO_ICONS.animation, run: () => animationTool.open(), disabled: noGame },
   { label: 'Physics Settings', hint: 'Movement, gravity, jumping; make it a platformer', icon: STUDIO_ICONS.physics, run: () => physicsTool.open(), disabled: noGame },
   { label: 'Sound Designer', hint: 'Background music and collision sounds', icon: STUDIO_ICONS.sound, run: () => soundTool.open(), disabled: noGame },
   { label: 'Debug this game', hint: 'Describe a problem; get a diagnosis and fix', icon: STUDIO_ICONS.debug, run: () => debugTool.open(), disabled: noGame },

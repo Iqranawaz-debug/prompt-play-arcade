@@ -8,7 +8,7 @@ import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isQuotaError, isTransientStatus, type ChatProvider } from '../generator/providers';
 import { AskError } from '../generator/ask';
-import { debugGame, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
+import { animateSprite, debugGame, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -86,6 +86,13 @@ toolRoute('/api/debug', z.object({ spec: GameSpecSchema, problem: z.string().tri
 toolRoute('/api/sprite', z.object({ sprite: SpriteSchema, change: z.string().trim().min(3).max(600), background: Hex }), async (b, p, signal) => ({
   sprite: await redrawSprite(p, b.sprite, b.change, b.background, signal),
 }));
+
+/** Extra animation frames for one sprite (Animation Studio). */
+toolRoute(
+  '/api/frames',
+  z.object({ sprite: SpriteSchema, motion: z.string().trim().min(3).max(300), count: z.number().int().min(1).max(3), background: Hex }),
+  async (b, p, signal) => ({ frames: await animateSprite(p, b.sprite, b.motion, b.count, b.background, signal) }),
+);
 
 app.post('/api/generate', async (req, res) => {
   if (!provider) {

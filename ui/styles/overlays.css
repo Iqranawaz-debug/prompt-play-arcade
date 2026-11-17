@@ -378,3 +378,15 @@ button.asset-tile span:last-child { font-size: 10.5px; color: var(--text-3); fon
 .physics-readout.warn { color: var(--danger, #f87171); }
 .map-preview { width: 100%; max-width: 480px; aspect-ratio: 480 / 248; border-radius: var(--r-md); border: 1px solid var(--border); }
 @media (max-width: 720px) { .mode-grid { grid-template-columns: 1fr 1fr; } }
+
+/* Animation Studio */
+.anim-preview { display: grid; gap: var(--s-2); justify-items: center; }
+.anim-stage { width: 100%; min-height: 220px; display: grid; place-items: center; overflow: hidden; }
+.anim-stage img { will-change: transform; }
+.anim-modes { width: 220px; }
+.anim-settings { display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+.frame-strip { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.frame-cell { position: relative; display: grid; justify-items: center; gap: 4px; width: 92px; padding: var(--s-2); border-radius: var(--r-md); border: 1px solid var(--border); }
+.frame-cell img { width: 56px; height: 56px; object-fit: contain; }
+.frame-cell span { font-size: var(--fs-xs); color: var(--text-2); }
+.frame-remove { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; min-height: 0; padding: 0; font-size: 14px; }
