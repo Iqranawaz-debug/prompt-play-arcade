@@ -1,11 +1,11 @@
-import Phaser from 'phaser';
-import { BlankScene } from '../engine/BlankScene';
+import { runGame } from '../engine';
+import { philosopherFishing } from '../spec/examples/philosopherFishing';
 
-new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  width: 800,
-  height: 600,
-  backgroundColor: '#1d2433',
-  scene: [BlankScene],
-});
+const parent = document.getElementById('game')!;
+runGame(philosopherFishing, parent)
+  .then((game) => {
+    if (import.meta.env.DEV) (window as unknown as { __game: unknown }).__game = game;
+  })
+  .catch((err: unknown) => {
+    parent.textContent = `Could not start game: ${err instanceof Error ? err.message : String(err)}`;
+  });
