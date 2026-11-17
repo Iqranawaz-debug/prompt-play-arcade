@@ -79,3 +79,14 @@ describe('bounceOffWalls', () => {
     expect(m.dir.x).toBe(-1);
   });
 });
+
+describe('patrol and platforms', () => {
+  it('patrols horizontally and spawns on a platform top away from the player', () => {
+    const state = newMover({ x: 0, y: 1 }, 'patrol', () => 0.9);
+    expect(state.dir).toEqual({ x: 1, y: 0 });
+    expect(steer('patrol', state, { x: 0, y: 0 }, { x: 0, y: 0 }, 100, 16)).toEqual({ x: 100, y: 0 });
+    const tops = [{ x: 100, y: 300 }, { x: 800, y: 300 }];
+    const { pos } = placeSpawn('platforms', { w: 20, h: 20 }, { x: 0, y: 44, w: 960, h: 496 }, { x: 110, y: 290 }, () => 0, tops);
+    expect(pos).toEqual({ x: 800, y: 290 });
+  });
+});

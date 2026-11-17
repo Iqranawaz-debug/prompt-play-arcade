@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_TILE, MAP_CHARS, jumpHeight, maxCols, maxRows, parseLevel, platformTops } from './level';
 
 /** Lowercase identifier used to cross-reference sprites and entities. */
 const Id = z
@@ -20,6 +21,17 @@ const Svg = z
     message: 'no scripts, event handlers, foreignObject or external hrefs',
   });
 
+export const IDLE_MOTIONS = ['none', 'bob', 'pulse', 'spin', 'sway', 'wobble'] as const;
+export const MOVE_MOTIONS = ['none', 'tilt', 'squash', 'bob'] as const;
+
+export const AnimSchema = z
+  .object({
+    idle: z.enum(IDLE_MOTIONS).default('none').describe('Motion while standing still'),
+    move: z.enum(MOVE_MOTIONS).default('none').describe('Motion while moving'),
+    speed: z.number().min(0.25).max(3).default(1).describe('1 = normal speed'),
+  })
+  .describe('Optional simple motion applied to the whole sprite');
+
 export const SpriteSchema = z.object({
   svg: Svg.describe('Inline SVG markup with a viewBox. Flat shapes, no text, no external refs.'),
   width: z.number().int().min(8).max(256).describe('Rendered width in pixels'),
@@ -28,6 +40,13 @@ export const SpriteSchema = z.object({
     .enum(['left', 'right', 'none'])
     .default('none')
     .describe('Which way the drawing faces, so the engine can mirror it when moving'),
+  anim: AnimSchema.optional(),
+  frames: z
+    .array(Svg)
+    .max(3)
+    .optional()
+    .describe('Optional extra animation frames (same viewBox as svg); the engine cycles svg + frames'),
+  fps: z.number().int().min(1).max(12).optional().describe('Frame rate when frames are given (default 6)'),
 });
 
 export const ThemeSchema = z.object({
@@ -40,8 +59,11 @@ export const ThemeSchema = z.object({
 export const PlayerSchema = z.object({
   sprite: Id,
   controls: z
-    .enum(['free', 'horizontal', 'vertical'])
-    .describe('free = move in all directions; horizontal/vertical = locked to one axis'),
+    .enum(['free', 'horizontal', 'vertical', 'platformer'])
+    .describe(
+      'free = move in all directions; horizontal/vertical = locked to one axis; ' +
+        'platformer = run left/right and jump, with physics.gravity pulling down',
+    ),
   speed: z.number().min(40).max(700).describe('Pixels per second'),
   start: z.object({ x: Frac, y: Frac }),
   lives: z.number().int().min(1).max(9),
@@ -50,7 +72,7 @@ export const PlayerSchema = z.object({
 export const MUSIC_STYLES = ['none', 'chill', 'arcade', 'spooky', 'upbeat', 'dreamy'] as const;
 export type MusicStyle = (typeof MUSIC_STYLES)[number];
 
-export const BEHAVIORS = ['straight', 'zigzag', 'chase', 'flee', 'wander', 'bounce', 'static'] as const;
+export const BEHAVIORS = ['straight', 'zigzag', 'chase', 'flee', 'wander', 'bounce', 'static', 'patrol'] as const;
 
 export const EntitySchema = z.object({
   id: Id,
@@ -60,7 +82,8 @@ export const EntitySchema = z.object({
     .enum(BEHAVIORS)
     .describe(
       'straight: crosses the screen away from its spawn edge; zigzag: straight with a wave; ' +
-        'chase/flee: toward/away from the player; wander: random turns; bounce: bounces off walls; static: does not move',
+        'chase/flee: toward/away from the player; wander: random turns; bounce: bounces off walls; static: does not move; ' +
+          'patrol: walks left and right, turning at walls and platform edges',
     ),
   speed: z.number().min(0).max(600).describe('Pixels per second'),
   onCollide: z.object({
@@ -82,8 +105,8 @@ export const EntitySchema = z.object({
 export const SpawnSchema = z.object({
   entity: Id,
   edge: z
-    .enum(['top', 'bottom', 'left', 'right', 'sides', 'anywhere'])
-    .describe('Where entities appear; sides = randomly left or right'),
+    .enum(['top', 'bottom', 'left', 'right', 'sides', 'anywhere', 'platforms'])
+    .describe('Where entities appear; sides = randomly left or right; platforms = standing on top of a level wall tile'),
   everyMs: z.number().int().min(200).max(20000),
   maxAlive: z.number().int().min(1).max(40),
   startDelayMs: z.number().int().min(0).max(60000).default(0),
@@ -93,6 +116,25 @@ export const WinSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('score'), target: z.number().int().min(1).max(10000) }),
   z.object({ type: z.literal('survive'), seconds: z.number().int().min(5).max(600) }),
 ]);
+
+export const LevelSchema = z
+  .object({
+    tileSize: z.number().int().min(20).max(80).default(DEFAULT_TILE).describe('Tile size in pixels'),
+    map: z
+      .array(z.string().max(48))
+      .min(1)
+      .max(24)
+      .describe('Rows from top to bottom: "#" = wall/platform, "." = empty, "P" = player start (optional)'),
+  })
+  .describe(`Optional tile map. With the default 40px tiles the field is ${maxCols(DEFAULT_TILE)} columns x ${maxRows(DEFAULT_TILE)} rows`);
+
+export const PhysicsSchema = z
+  .object({
+    gravity: z.number().min(0).max(2000).default(0).describe('Downward pull in px/s^2 (platformer only)'),
+    jump: z.number().min(0).max(1200).default(0).describe('Jump launch speed in px/s (platformer only)'),
+    friction: z.number().min(0).max(1).default(0).describe('0 = stop instantly, 1 = very slippery'),
+  })
+  .describe('Optional physics; needed for platformer controls');
 
 const GameSpecBase = z
   .object({
@@ -118,6 +160,8 @@ const GameSpecBase = z
         .optional()
         .describe('Lose when time runs out. Losing all lives always ends the game.'),
     }),
+    level: LevelSchema.optional(),
+    physics: PhysicsSchema.optional(),
     audio: z
       .object({
         music: z.enum(MUSIC_STYLES).default('none').describe('Background music style, played during a round'),
@@ -155,8 +199,46 @@ export const GameSpecSchema = GameSpecBase.superRefine((spec, ctx) => {
   if (spec.win.type === 'survive' && spec.lose.timeLimitSeconds !== undefined) {
     issue(['lose', 'timeLimitSeconds'], 'a survive win cannot also have a time limit');
   }
+  checkLevel(spec, issue);
   checkBalance(spec, issue);
 });
+
+/** A player jump must clear at least this many tiles, so platforms are reachable. */
+export const MIN_JUMP_TILES = 1.5;
+
+function checkLevel(spec: ParsedSpec, issue: Issue): void {
+  const tile = spec.level?.tileSize ?? DEFAULT_TILE;
+  if (spec.level) {
+    const cols = maxCols(tile);
+    const rows = maxRows(tile);
+    if (spec.level.map.length > rows) issue(['level', 'map'], `at most ${rows} rows for ${tile}px tiles (got ${spec.level.map.length})`);
+    let starts = 0;
+    spec.level.map.forEach((row, i) => {
+      if (row.length > cols) issue(['level', 'map', i], `at most ${cols} columns for ${tile}px tiles (got ${row.length})`);
+      if (!MAP_CHARS.test(row)) issue(['level', 'map', i], 'only "#", ".", " " and "P" are allowed');
+      starts += row.split('P').length - 1;
+    });
+    if (starts > 1) issue(['level', 'map'], 'at most one "P" (player start)');
+  }
+  if (spec.player.controls === 'platformer') {
+    const p = spec.physics;
+    if (!p || p.gravity < 200) issue(['physics', 'gravity'], 'platformer controls need physics.gravity of at least 200');
+    else {
+      const need = Math.ceil(MIN_JUMP_TILES * tile);
+      const height = jumpHeight(p.jump, p.gravity);
+      if (height < need) {
+        const minJump = Math.ceil(Math.sqrt(2 * p.gravity * need));
+        issue(['physics', 'jump'], `jump only reaches ${Math.floor(height)}px; it must reach ${need}px (1.5 tiles), so use jump >= ${minJump}`);
+      }
+    }
+  }
+  spec.spawns.forEach((s, i) => {
+    if (s.edge !== 'platforms') return;
+    if (!spec.level || platformTops(parseLevel(spec.level)).length === 0) {
+      issue(['spawns', i, 'edge'], '"platforms" spawns need a level map with wall tiles that have empty space above them');
+    }
+  });
+}
 
 /** Chasing hazards faster than this share of the player's speed cannot be escaped. */
 export const MAX_CHASER_SPEED_RATIO = 0.75;

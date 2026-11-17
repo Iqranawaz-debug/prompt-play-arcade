@@ -7,7 +7,7 @@ import { notify } from '../notifications';
 import type { StudioContext } from './context';
 import { createToolDialog, field, textarea } from './dialog';
 
-const MOVEMENT = { free: 'Moves in all directions', horizontal: 'Moves left and right', vertical: 'Moves up and down' } as const;
+const MOVEMENT = { free: 'Moves in all directions', horizontal: 'Moves left and right', vertical: 'Moves up and down', platformer: 'Runs and jumps' } as const;
 
 /** Character Creator: describe appearance, personality, abilities and movement; get a sprite and stats. */
 export function createCharacterCreator(host: HTMLElement, ctx: StudioContext) {

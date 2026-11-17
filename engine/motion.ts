@@ -29,7 +29,7 @@ type Rng = () => number;
 /** After this long, roaming entities stop roaming and leave the screen. */
 export const LIFETIME_MS = 15000;
 /** Behaviors that stay inside the play area (bouncing off walls) until they leave. */
-export const CONTAINED: ReadonlySet<Behavior> = new Set(['bounce', 'wander', 'chase', 'flee']);
+export const CONTAINED: ReadonlySet<Behavior> = new Set(['bounce', 'wander', 'chase', 'flee', 'patrol']);
 
 const norm = (v: Vec): Vec => {
   const len = Math.hypot(v.x, v.y);
@@ -48,8 +48,10 @@ export function placeSpawn(
   field: Rect,
   player: Vec,
   rng: Rng = Math.random,
+  /** Standing spots for "platforms" spawns (centre-bottom of each empty tile above a wall). */
+  tops: Vec[] = [],
 ): { pos: Vec; dir: Vec } {
-  const resolved = edge === 'sides' ? (rng() < 0.5 ? 'left' : 'right') : edge;
+  const resolved = edge === 'sides' ? (rng() < 0.5 ? 'left' : 'right') : edge === 'platforms' && tops.length === 0 ? 'anywhere' : edge;
   const margin = 40;
   const randX = () => field.x + margin + rng() * (field.w - margin * 2);
   const randY = () => field.y + margin + rng() * (field.h - margin * 2);
@@ -70,10 +72,20 @@ export function placeSpawn(
       }
       return { pos, dir: rotate({ x: 1, y: 0 }, rng() * Math.PI * 2) };
     }
+    case 'platforms': {
+      const far = tops.filter((t) => Math.hypot(t.x - player.x, t.y - player.y) >= 150);
+      const pool = far.length ? far : tops;
+      const spot = pool[Math.floor(rng() * pool.length)];
+      return { pos: { x: spot.x, y: spot.y - size.h / 2 }, dir: { x: rng() < 0.5 ? -1 : 1, y: 0 } };
+    }
   }
 }
 
 export function newMover(dir: Vec, behavior: Behavior, rng: Rng = Math.random): MoverState {
+  if (behavior === 'patrol') {
+    const x = dir.x === 0 ? (rng() < 0.5 ? -1 : 1) : Math.sign(dir.x);
+    return { dir: { x, y: 0 }, ageMs: 0, phase: rng() * Math.PI * 2, turnInMs: 1000, leaving: false };
+  }
   const spread = behavior === 'bounce' || behavior === 'wander' ? (rng() - 0.5) * 1.2 : 0;
   return { dir: rotate(dir, spread), ageMs: 0, phase: rng() * Math.PI * 2, turnInMs: 1000, leaving: false };
 }
@@ -95,6 +107,8 @@ export function steer(
   switch (behavior) {
     case 'static':
       return { x: 0, y: 0 };
+    case 'patrol':
+      return { x: Math.sign(state.dir.x || 1) * speed, y: 0 };
     case 'straight':
     case 'bounce':
       return { x: state.dir.x * speed, y: state.dir.y * speed };
