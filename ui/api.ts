@@ -1,5 +1,6 @@
 import type { GenerateEvent, GenerateProgress } from '../generator/generate';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
+import type { GameOptions } from '../spec/gameOptions';
 
 export interface Health {
   ok: boolean;
@@ -30,6 +31,8 @@ export class GenerateFailure extends Error {
 export interface GenerateCallbacks {
   onStatus?: (progress: GenerateProgress) => void;
   signal?: AbortSignal;
+  /** Settings for a new game (not sent when remixing). */
+  options?: GameOptions;
 }
 
 /** Read an NDJSON response body one event at a time. */
@@ -58,14 +61,14 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Gen
 export async function generateGame(
   prompt: string,
   base?: GameSpec,
-  { onStatus, signal }: GenerateCallbacks = {},
+  { onStatus, signal, options }: GenerateCallbacks = {},
 ): Promise<{ spec: GameSpec; attempts: number }> {
   let res: Response;
   try {
     res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, base }),
+      body: JSON.stringify({ prompt, base, options: base ? undefined : options }),
       signal,
     });
   } catch (err) {

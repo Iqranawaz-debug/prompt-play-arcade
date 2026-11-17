@@ -141,3 +141,18 @@ describe('busy model back-off', () => {
     await expect(generateSpec(busyThen(1, 401), 'x', { busyDelaysMs: [0, 0] })).rejects.toMatchObject({ status: 401 });
   });
 });
+
+describe('game options in the prompt', () => {
+  it('adds the chosen genre, difficulty, duration, style and sound to the first message', async () => {
+    const { generateFromIdea } = await import('./generate');
+    const { provider, calls } = fakeProvider([valid]);
+    await generateFromIdea(provider, 'a bee game', { game: { genre: 'chase', difficulty: 'hard', duration: 'short', style: 'neon', sound: false } });
+    const msg = calls[0][1].content;
+    expect(msg).toContain('a bee game');
+    expect(msg).toContain('"chase" behavior');
+    expect(msg).toContain('Hard:');
+    expect(msg).toContain('about 45 seconds');
+    expect(msg).toContain('neon outlines');
+    expect(msg).toContain('"sfx" to "none"');
+  });
+});

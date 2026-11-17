@@ -110,6 +110,8 @@ kbd {
   background: rgb(255 255 255 / 0.06); border: 1px solid var(--border-strong); border-bottom-width: 2px;
 }
 #generate { width: 100%; margin-top: var(--s-3); }
+/* Stays reachable when the composer scrolls (e.g. game settings expanded on a short screen). */
+.composer-panel #generate { position: sticky; bottom: 0; z-index: 2; }
 #generate .icon { width: 18px; height: 18px; }
 .composer.remixing #generate { --btn-a: #b3a8fb; --btn-b: var(--violet); --btn-c: var(--violet-2); --btn-glow: var(--violet-2-rgb); color: #fff; }
 /* Once there is a prompt to send, Generate breathes a soft glow to invite the click. */
@@ -361,3 +363,25 @@ button.fav.on { color: #fcd34d; }
 button.fav.on .icon { fill: currentColor; filter: drop-shadow(0 0 6px rgb(252 211 77 / 0.5)); }
 .tag.genre { color: var(--text-2); background: rgb(255 255 255 / 0.07); }
 .library .empty button { margin-top: var(--s-2); }
+
+/* ---------- Game settings (before generating) ---------- */
+.game-options { margin-top: var(--s-3); border-radius: var(--r-md); border: 1px solid var(--border); background: rgb(255 255 255 / 0.02); }
+button.options-toggle {
+  width: 100%; height: 36px; justify-content: flex-start; gap: var(--s-2); padding: 0 var(--s-3);
+  border: 0; border-radius: var(--r-md); background: transparent; font-size: var(--fs-xs);
+}
+button.options-toggle:hover:not(:disabled) { background: rgb(255 255 255 / 0.04); }
+.options-label { flex: none; font-weight: 650; color: var(--text); }
+.options-summary { flex: 1; min-width: 0; text-align: left; color: var(--text-3); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chevron { flex: none; width: 8px; height: 8px; border-right: 1.75px solid var(--text-3); border-bottom: 1.75px solid var(--text-3); transform: rotate(45deg) translateY(-2px); transition: transform var(--t) var(--ease); }
+.options-toggle[aria-expanded='true'] .chevron { transform: rotate(-135deg) translateY(-2px); }
+.options-body { display: grid; gap: var(--s-3); padding: var(--s-1) var(--s-3) var(--s-3); animation: rise var(--t) var(--ease); }
+.option-field { display: grid; gap: 6px; min-width: 0; }
+.option-field.inline { display: flex; align-items: center; justify-content: space-between; }
+.option-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.option-name { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+.option-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.option-chips button { height: 26px; padding: 0 10px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; color: var(--text-2); }
+.option-chips button[aria-checked='true'] { color: var(--accent-ink); border-color: transparent; background: linear-gradient(180deg, var(--accent-hi), var(--accent)); }
+.option-pair .segmented button { height: 26px; font-size: 11px; padding: 0 4px; }
+.composer.remixing .game-options { display: none; }

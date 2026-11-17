@@ -5,6 +5,7 @@ import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, markPlayed, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { createGameOptions } from './gameOptions';
 import { GENRES } from './genre';
 import { SORTS, filterCounts, queryGames, type LibraryFilter, type LibraryQuery, type LibrarySort } from './libraryQuery';
 import { exportGame } from './export';
@@ -44,6 +45,7 @@ const stageEmpty = $('stage-empty');
 const frameWrap = $('frame-wrap');
 const ideaChips = [...document.querySelectorAll<HTMLButtonElement>('#idea-chips button')];
 
+const gameOptions = createGameOptions($('game-options'));
 const status = new StatusBox($('gen-status-box'), $('gen-phase'), $('gen-detail'), $('gen-progress'));
 const DEFAULT_PLACEHOLDER = promptBox.placeholder;
 let activeId: string | undefined;
@@ -103,7 +105,11 @@ const player = new GamePlayer(
     onStatus: (s) => showGameStatus(s),
     onShortcut: () => palette.open(),
   },
-  () => ({ muted: !getSettings().gameSound, maxZoom: getSettings().previewQuality === 'balanced' ? 1.25 : undefined }),
+  () => ({
+    // Muted if sound is off in Settings, or this game was generated as a quiet game.
+    muted: !getSettings().gameSound || allGames.find((g) => g.id === activeId)?.options?.sound === false,
+    maxZoom: getSettings().previewQuality === 'balanced' ? 1.25 : undefined,
+  }),
 );
 
 /** Keep the preview chrome in step with the player: buttons, empty state, glow and heading. */
@@ -291,6 +297,7 @@ function setBusy(busy: boolean): void {
   promptBox.disabled = busy;
   remixBanner.querySelector('button')!.disabled = busy;
   for (const chip of ideaChips) chip.disabled = busy;
+  gameOptions.setDisabled(busy);
   setButtonLabel(generateBtn, buttonLabel(busy));
 }
 
@@ -310,7 +317,9 @@ form.addEventListener('submit', async (e) => {
   setBusy(true);
   status.start(base ? 'Remixing…' : 'Generating…', `Asking ${modelName}`);
   try {
+    const chosen = gameOptions.get();
     const { spec, attempts } = await generateGame(prompt, base?.spec, {
+      options: chosen,
       signal: controller.signal,
       onStatus: (p) => {
         const { phase, detail } = describeProgress(p, modelName);
@@ -319,7 +328,7 @@ form.addEventListener('submit', async (e) => {
     });
     const game = base
       ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, { remixOf: base.id })
-      : await addGame(prompt, spec);
+      : await addGame(prompt, spec, { options: chosen });
     genNote.textContent = `Created "${spec.title}"${attempts > 1 ? ` after ${attempts} attempts` : ''}.`;
     notify('success', base ? 'Remix ready' : 'Game generated successfully', `"${spec.title}" is ready to play.`);
     promptBox.value = '';

@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { GameSpecSchema } from '../spec/schema';
+import { GameOptionsSchema } from '../spec/gameOptions';
 import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
 import { ProviderError, isTransientStatus } from '../generator/providers';
@@ -14,7 +15,12 @@ const app = express();
 app.use(express.json({ limit: '256kb' }));
 
 /** `base` is set when remixing: the prompt then describes changes to that spec. */
-const GenerateBody = z.object({ prompt: z.string().trim().min(3).max(2000), base: GameSpecSchema.optional() });
+const GenerateBody = z.object({
+  prompt: z.string().trim().min(3).max(2000),
+  base: GameSpecSchema.optional(),
+  /** Genre, difficulty, duration, style and sound chosen before generating (new games only). */
+  options: GameOptionsSchema.optional(),
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, provider: provider?.name ?? null, label: provider?.label ?? null });
@@ -48,7 +54,7 @@ app.post('/api/generate', async (req, res) => {
   });
 
   const started = Date.now();
-  const options: GenerateOptions = { signal: cancel.signal, onProgress: (p) => send({ type: 'status', ...p }) };
+  const options: GenerateOptions = { signal: cancel.signal, onProgress: (p) => send({ type: 'status', ...p }), game: body.data.options };
   try {
     const { prompt, base } = body.data;
     const { spec, attempts } = base

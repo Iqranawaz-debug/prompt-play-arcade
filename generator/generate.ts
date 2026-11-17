@@ -1,6 +1,7 @@
 import { GameSpecSchema, formatIssues, type GameSpec } from '../spec/schema';
 import { SYSTEM_PROMPT, remixPrompt, retryPrompt, userPrompt } from './prompt';
 import { ProviderError, isTransientStatus, type ChatMessage, type ChatProvider } from './providers';
+import type { GameOptions } from '../spec/gameOptions';
 
 export const MAX_RETRIES = 2;
 
@@ -58,6 +59,8 @@ export type GenerateEvent =
 export const BUSY_DELAYS_MS = [2000, 5000];
 
 export interface GenerateOptions {
+  /** Player's game settings (genre, difficulty...), added to the first prompt of a new game. */
+  game?: GameOptions;
   maxRetries?: number;
   onProgress?: (progress: GenerateProgress) => void;
   /** Aborts the in-flight model request (e.g. when the user cancels). */
@@ -129,7 +132,7 @@ export async function generateSpec(
 }
 
 export const generateFromIdea = (provider: ChatProvider, idea: string, options?: GenerateOptions) =>
-  generateSpec(provider, userPrompt(idea), options);
+  generateSpec(provider, userPrompt(idea, options?.game), options);
 
 export const generateRemix = (provider: ChatProvider, base: GameSpec, changes: string, options?: GenerateOptions) =>
   generateSpec(provider, remixPrompt(base, changes), options);

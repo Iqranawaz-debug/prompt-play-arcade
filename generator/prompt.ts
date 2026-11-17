@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
+import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
 
@@ -57,8 +58,9 @@ ${JSON.stringify(philosopherFishing)}
 Example 2:
 ${JSON.stringify(cometCourier)}`;
 
-export function userPrompt(idea: string): string {
-  return `Design a game for this idea:\n"""${idea}"""\nReply with the JSON object only.`;
+export function userPrompt(idea: string, options?: GameOptions): string {
+  const settings = options ? `\n\n${optionsBrief(options)}` : '';
+  return `Design a game for this idea:\n"""${idea}"""${settings}\nReply with the JSON object only.`;
 }
 
 export function remixPrompt(base: GameSpec, changes: string): string {
