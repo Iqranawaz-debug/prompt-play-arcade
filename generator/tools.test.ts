@@ -117,3 +117,14 @@ describe('storyboard rules', () => {
     expect(StoryboardSchema.safeParse(storyboard).success).toBe(true);
   });
 });
+
+describe('diffValues', () => {
+  it('lists what a fix changes in readable paths', async () => {
+    const { diffValues } = await import('../spec/diff');
+    const fixed = structuredClone(comet);
+    fixed.player.controls = 'free';
+    fixed.spawns[1].everyMs = 1400;
+    expect(diffValues(comet, fixed)).toEqual(['player.controls: "horizontal" -> "free"', 'spawns[1].everyMs: 900 -> 1400']);
+    expect(diffValues(comet, comet)).toEqual([]);
+  });
+});
