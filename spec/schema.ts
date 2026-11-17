@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { jumpReach, startTile, unreachable } from './reach';
 import { DEFAULT_TILE, MAP_CHARS, jumpHeight, maxCols, maxRows, parseLevel, platformTops } from './level';
 
 /** Lowercase identifier used to cross-reference sprites and entities. */
@@ -119,6 +120,7 @@ export const WinSchema = z.discriminatedUnion('type', [
 
 export const LevelSchema = z
   .object({
+    name: z.string().max(40).optional().describe('Level name shown when it starts'),
     tileSize: z.number().int().min(20).max(80).default(DEFAULT_TILE).describe('Tile size in pixels'),
     map: z
       .array(z.string().max(48))
@@ -161,6 +163,12 @@ const GameSpecBase = z
         .describe('Lose when time runs out. Losing all lives always ends the game.'),
     }),
     level: LevelSchema.optional(),
+    levels: z
+      .array(LevelSchema)
+      .min(1)
+      .max(8)
+      .optional()
+      .describe("Optional sequence of levels played in order (instead of level); the win condition applies to each level"),
     physics: PhysicsSchema.optional(),
     audio: z
       .object({
@@ -206,22 +214,21 @@ export const GameSpecSchema = GameSpecBase.superRefine((spec, ctx) => {
 /** A player jump must clear at least this many tiles, so platforms are reachable. */
 export const MIN_JUMP_TILES = 1.5;
 
+/** Every level of a game, in play order: `levels` if given, else the single `level`. */
+export function levelsOf<L>(spec: { level?: L; levels?: L[] }): L[] {
+  return spec.levels?.length ? spec.levels : spec.level ? [spec.level] : [];
+}
+
 function checkLevel(spec: ParsedSpec, issue: Issue): void {
-  const tile = spec.level?.tileSize ?? DEFAULT_TILE;
-  if (spec.level) {
-    const cols = maxCols(tile);
-    const rows = maxRows(tile);
-    if (spec.level.map.length > rows) issue(['level', 'map'], `at most ${rows} rows for ${tile}px tiles (got ${spec.level.map.length})`);
-    let starts = 0;
-    spec.level.map.forEach((row, i) => {
-      if (row.length > cols) issue(['level', 'map', i], `at most ${cols} columns for ${tile}px tiles (got ${row.length})`);
-      if (!MAP_CHARS.test(row)) issue(['level', 'map', i], 'only "#", ".", " " and "P" are allowed');
-      starts += row.split('P').length - 1;
-    });
-    if (starts > 1) issue(['level', 'map'], 'at most one "P" (player start)');
-  }
-  if (spec.player.controls === 'platformer') {
-    const p = spec.physics;
+  const levels = levelsOf(spec);
+  const root = spec.levels?.length ? 'levels' : 'level';
+  const at = (i: number): PropertyKey[] => (root === 'levels' ? ['levels', i] : ['level']);
+  if (spec.level && spec.levels?.length) issue(['level'], 'use either "level" or "levels", not both');
+  const platformer = spec.player.controls === 'platformer';
+  const p = spec.physics;
+  const tile = Math.max(DEFAULT_TILE, ...levels.map((l) => l.tileSize));
+
+  if (platformer) {
     if (!p || p.gravity < 200) issue(['physics', 'gravity'], 'platformer controls need physics.gravity of at least 200');
     else {
       const need = Math.ceil(MIN_JUMP_TILES * tile);
@@ -232,10 +239,40 @@ function checkLevel(spec: ParsedSpec, issue: Issue): void {
       }
     }
   }
+
+  levels.forEach((level, i) => {
+    const cols = maxCols(level.tileSize);
+    const rows = maxRows(level.tileSize);
+    let bad = level.map.length > rows;
+    if (bad) issue([...at(i), 'map'], `at most ${rows} rows for ${level.tileSize}px tiles (got ${level.map.length})`);
+    let starts = 0;
+    level.map.forEach((row, r) => {
+      if (row.length > cols) issue([...at(i), 'map', r], `at most ${cols} columns for ${level.tileSize}px tiles (got ${row.length})`);
+      if (!MAP_CHARS.test(row)) issue([...at(i), 'map', r], 'only "#", ".", " " and "P" are allowed');
+      bad ||= row.length > cols || !MAP_CHARS.test(row);
+      starts += row.split('P').length - 1;
+    });
+    if (starts > 1) issue([...at(i), 'map'], 'at most one "P" (player start)');
+    if (bad || (platformer && (!p || p.gravity < 200))) return;
+
+    const grid = parseLevel(level);
+    const mobility = { platformer, speed: spec.player.speed, jump: p?.jump ?? 0, gravity: p?.gravity ?? 0 };
+    const lost = unreachable(grid, startTile(grid, spec.player.start, platformer), mobility);
+    if (lost.length) {
+      const where = lost.slice(0, 3).map((t) => `row ${t.row} col ${t.col}`).join(', ');
+      issue(
+        [...at(i), 'map'],
+        platformer
+          ? `${lost.length} standing spot(s) cannot be reached from the start (e.g. ${where}); move ledges closer: at most ${jumpReach(grid, mobility).up} rows up and ${jumpReach(grid, mobility).across} columns across per jump`
+          : `${lost.length} empty tile(s) are walled off from the start (e.g. ${where}); open a gap or fill them with "#"`,
+      );
+    }
+  });
+
   spec.spawns.forEach((s, i) => {
     if (s.edge !== 'platforms') return;
-    if (!spec.level || platformTops(parseLevel(spec.level)).length === 0) {
-      issue(['spawns', i, 'edge'], '"platforms" spawns need a level map with wall tiles that have empty space above them');
+    if (!levels.length || levels.some((l) => platformTops(parseLevel(l)).length === 0)) {
+      issue(['spawns', i, 'edge'], '"platforms" spawns need level maps with wall tiles that have empty space above them');
     }
   });
 }

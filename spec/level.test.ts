@@ -7,7 +7,7 @@ const platformer = (): GameSpecInput => {
   const s: GameSpecInput = structuredClone(philosopherFishing);
   s.player.controls = 'platformer';
   s.physics = { gravity: 1200, jump: 560 };
-  s.level = { map: ['', '', '', '', '', '', '....####', '', '', '', '', '########################'] };
+  s.level = { map: ['', '', '', '', '', '', '', '', '', '....####', '', '########################'] };
   return s;
 };
 
@@ -63,7 +63,7 @@ describe('platformer specs', () => {
   it('needs a map for platforms spawns', () => {
     const s: GameSpecInput = structuredClone(philosopherFishing);
     s.spawns[0].edge = 'platforms';
-    expect(formatIssues(GameSpecSchema.safeParse(s).error!)).toContain('"platforms" spawns need a level map');
+    expect(formatIssues(GameSpecSchema.safeParse(s).error!)).toContain('"platforms" spawns need level maps');
     expect(GameSpecSchema.safeParse({ ...platformer(), spawns: s.spawns }).success).toBe(true);
   });
 });
@@ -72,5 +72,31 @@ describe('lanternHop example', () => {
   it('is a valid platformer', async () => {
     const { lanternHop } = await import('./examples/lanternHop');
     expect(GameSpecSchema.safeParse(lanternHop).error?.issues ?? []).toEqual([]);
+  });
+});
+
+describe('reachability and multiple levels', () => {
+  it('rejects a ledge that is too high to jump to', () => {
+    const s = platformer();
+    s.level!.map = ['', '', '', '....####', '', '', '', '', '', '', '', '########################'];
+    expect(formatIssues(GameSpecSchema.safeParse(s).error!)).toMatch(/level\.map: \d+ standing spot\(s\) cannot be reached/);
+  });
+
+  it('rejects walled-off pockets in top-down games', () => {
+    const s: GameSpecInput = structuredClone(philosopherFishing);
+    s.level = { map: ['', '', '', '', '', '', '', '', '', '###', '..#', '..#'] };
+    expect(formatIssues(GameSpecSchema.safeParse(s).error!)).toContain('walled off from the start');
+  });
+
+  it('accepts a list of levels and reports problems per level', () => {
+    const s = platformer();
+    const good = s.level!;
+    s.level = undefined;
+    s.levels = [{ ...good, name: 'One' }, { name: 'Two', map: ['', '', '', '....####', '', '', '', '', '', '', '', '#'.repeat(24)] }];
+    const text = formatIssues(GameSpecSchema.safeParse(s).error!);
+    expect(text).toContain('levels.1.map');
+    expect(text).not.toContain('levels.0');
+    s.levels[1] = { name: 'Two', map: good.map };
+    expect(GameSpecSchema.safeParse(s).success).toBe(true);
   });
 });
