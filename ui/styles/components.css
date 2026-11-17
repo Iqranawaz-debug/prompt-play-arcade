@@ -327,3 +327,37 @@ kbd {
 /* Once WebGL is running, the 3D model replaces the flat SVG illustration. */
 .empty-inner.has-3d .empty-3d { display: block; animation: rise 500ms var(--ease); }
 .empty-inner.has-3d .empty-art { display: none; }
+
+/* ---------- Smart library: search, sort, filter chips, favorites ---------- */
+.library-tools { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
+.search-field {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2); height: var(--h-sm); padding: 0 var(--s-3);
+  border-radius: var(--r-sm); background: var(--surface-sunken); border: 1px solid var(--border-strong); color: var(--text-3);
+  transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.search-field:focus-within { border-color: rgb(var(--accent-rgb) / 0.6); box-shadow: var(--ring); }
+.search-field input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--text); font: inherit; font-size: var(--fs-sm); }
+.search-field input::placeholder { color: var(--text-3); }
+select#library-sort {
+  height: var(--h-sm); padding: 0 var(--s-2); border-radius: var(--r-sm); font: inherit; font-size: var(--fs-xs); font-weight: 550;
+  color: var(--text-2); background: var(--surface-sunken); border: 1px solid var(--border-strong); cursor: pointer;
+}
+select#library-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filter-chips {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--s-2); margin-bottom: var(--s-1); scrollbar-width: none;
+  mask-image: linear-gradient(90deg, #000 88%, transparent); /* hints that the row scrolls */
+}
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips button { flex: none; height: 26px; padding: 0 10px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; color: var(--text-2); }
+.filter-chips button .count { margin-left: 4px; color: var(--text-3); font-weight: 500; }
+.filter-chips button[aria-pressed='true'] { color: var(--accent-ink); border-color: transparent; background: linear-gradient(180deg, var(--accent-hi), var(--accent)); }
+.filter-chips button[aria-pressed='true'] .count { color: inherit; opacity: 0.7; }
+.filter-chips button:disabled { opacity: 0.35; }
+
+button.fav { flex: none; width: 24px; height: 24px; padding: 0; margin-left: auto; border: 0; background: transparent; color: var(--text-3); }
+button.fav .icon { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+button.fav:hover:not(:disabled) { color: #fcd34d; background: rgb(252 211 77 / 0.1); }
+button.fav.on { color: #fcd34d; }
+button.fav.on .icon { fill: currentColor; filter: drop-shadow(0 0 6px rgb(252 211 77 / 0.5)); }
+.tag.genre { color: var(--text-2); background: rgb(255 255 255 / 0.07); }
+.library .empty button { margin-top: var(--s-2); }

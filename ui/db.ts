@@ -1,21 +1,65 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
+import type { GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
+import { guessGenre, type Genre } from './genre';
+
+/** One saved state of a game. Remixes add versions; restoring makes an older one current again. */
+export interface GameVersion {
+  n: number;
+  spec: GameSpec;
+  /** What changed, e.g. "Original" or the remix request. */
+  note: string;
+  createdAt: number;
+}
 
 export interface SavedGame {
   id: string;
   title: string;
   prompt: string;
+  /** The current version's spec. */
   spec: GameSpec;
-  /** Id of the game this one was remixed from. */
+  /** Id of the game this one was remixed from (older remixes were saved as separate games). */
   remixOf?: string;
   createdAt: number;
   updatedAt: number;
+  favorite?: boolean;
+  lastPlayedAt?: number;
+  playCount?: number;
+  genre?: Genre;
+  /** Settings chosen when it was generated. */
+  options?: GameOptions;
+  versions?: GameVersion[];
 }
 
-const db = new Dexie('game-generator') as Dexie & { games: EntityTable<SavedGame, 'id'> };
+/** One finished round, for personal stats. */
+export interface PlayRecord {
+  id?: number;
+  gameId: string;
+  title: string;
+  result: 'won' | 'lost';
+  score: number;
+  durationMs: number;
+  endedAt: number;
+}
+
+const db = new Dexie('game-generator') as Dexie & {
+  games: EntityTable<SavedGame, 'id'>;
+  plays: EntityTable<PlayRecord, 'id'>;
+};
 db.version(1).stores({ games: 'id, updatedAt' });
+db.version(2)
+  .stores({ games: 'id, updatedAt, createdAt, lastPlayedAt', plays: '++id, gameId, endedAt' })
+  .upgrade((tx) =>
+    tx
+      .table('games')
+      .toCollection()
+      .modify((g: SavedGame) => {
+        g.versions ??= [{ n: 1, spec: g.spec, note: g.remixOf ? 'Remix' : 'Original', createdAt: g.createdAt }];
+        g.genre ??= guessGenre(g.spec);
+      }),
+  );
 
 export function listGames(): Promise<SavedGame[]> {
   return db.games.orderBy('updatedAt').reverse().toArray();
@@ -25,15 +69,72 @@ export function getGame(id: string): Promise<SavedGame | undefined> {
   return db.games.get(id);
 }
 
-export async function addGame(prompt: string, spec: GameSpec, remixOf?: string): Promise<SavedGame> {
+export async function addGame(prompt: string, spec: GameSpec, extra: { remixOf?: string; options?: GameOptions } = {}): Promise<SavedGame> {
   const now = Date.now();
-  const game: SavedGame = { id: crypto.randomUUID(), title: spec.title, prompt, spec, remixOf, createdAt: now, updatedAt: now };
+  const game: SavedGame = {
+    id: crypto.randomUUID(),
+    title: spec.title,
+    prompt,
+    spec,
+    remixOf: extra.remixOf,
+    createdAt: now,
+    updatedAt: now,
+    genre: extra.options?.genre ?? guessGenre(spec),
+    options: extra.options,
+    versions: [{ n: 1, spec, note: 'Original', createdAt: now }],
+  };
   await db.games.add(game);
   return game;
 }
 
-export function deleteGame(id: string): Promise<void> {
-  return db.games.delete(id);
+export async function deleteGame(id: string): Promise<void> {
+  await db.transaction('rw', db.games, db.plays, async () => {
+    await db.games.delete(id);
+    await db.plays.where('gameId').equals(id).delete();
+  });
+}
+
+export async function setFavorite(id: string, favorite: boolean): Promise<void> {
+  await db.games.update(id, { favorite });
+}
+
+/** Called when a game is launched. */
+export async function markPlayed(id: string): Promise<void> {
+  const game = await db.games.get(id);
+  if (game) await db.games.update(id, { lastPlayedAt: Date.now(), playCount: (game.playCount ?? 0) + 1 });
+}
+
+/** Save a new version (e.g. a remix) and make it current. */
+export async function addVersion(id: string, spec: GameSpec, note: string): Promise<SavedGame | undefined> {
+  const game = await db.games.get(id);
+  if (!game) return undefined;
+  const versions = game.versions ?? [{ n: 1, spec: game.spec, note: 'Original', createdAt: game.createdAt }];
+  const n = Math.max(...versions.map((v) => v.n)) + 1;
+  const next: Partial<SavedGame> = { spec, title: spec.title, updatedAt: Date.now(), versions: [...versions, { n, spec, note, createdAt: Date.now() }] };
+  await db.games.update(id, next);
+  return { ...game, ...next } as SavedGame;
+}
+
+/** Make an older version current again (history is kept, nothing is lost). */
+export async function restoreVersion(id: string, n: number): Promise<SavedGame | undefined> {
+  const game = await db.games.get(id);
+  const version = game?.versions?.find((v) => v.n === n);
+  if (!game || !version) return undefined;
+  const next: Partial<SavedGame> = { spec: version.spec, title: version.spec.title, updatedAt: Date.now() };
+  await db.games.update(id, next);
+  return { ...game, ...next } as SavedGame;
+}
+
+export async function recordPlay(record: Omit<PlayRecord, 'id'>): Promise<void> {
+  await db.plays.add(record);
+}
+
+export function listPlays(): Promise<PlayRecord[]> {
+  return db.plays.orderBy('endedAt').reverse().toArray();
+}
+
+export async function clearStats(): Promise<void> {
+  await db.plays.clear();
 }
 
 /** Put the two hand-written examples in an empty library so there is something to play offline. */

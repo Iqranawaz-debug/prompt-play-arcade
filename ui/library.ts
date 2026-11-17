@@ -1,5 +1,6 @@
 import type { SavedGame } from './db';
 import { renderCover } from './cover';
+import { genreName } from './genre';
 import { ICONS, iconButton, setButtonLabel } from './icons';
 
 export interface LibraryActions {
@@ -7,6 +8,7 @@ export interface LibraryActions {
   remix(game: SavedGame): void;
   exportHtml(game: SavedGame): void;
   remove(game: SavedGame): void;
+  toggleFavorite(game: SavedGame): void;
 }
 
 /** Delete needs a second click within 3s, so a stray click never loses a game. */
@@ -61,13 +63,23 @@ function card(game: SavedGame, active: boolean, actions: LibraryActions): HTMLLI
   const titleRow = el('div', 'title-row');
   const title = el('strong', '', game.title);
   title.title = game.title;
-  titleRow.append(title);
+  const fav = el('button', game.favorite ? 'fav on' : 'fav');
+  fav.type = 'button';
+  fav.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
+  fav.setAttribute('aria-pressed', String(Boolean(game.favorite)));
+  fav.setAttribute('aria-label', game.favorite ? `Remove "${game.title}" from favorites` : `Add "${game.title}" to favorites`);
+  fav.title = game.favorite ? 'Favorite' : 'Add to favorites';
+  fav.addEventListener('click', () => actions.toggleFavorite(game));
+  titleRow.append(title, fav);
   const prompt = el('p', 'prompt', game.prompt);
   prompt.title = game.prompt;
   const meta = el('div', 'meta');
   if (active) meta.append(el('span', 'badge', 'Now playing'));
+  meta.append(el('span', 'tag genre', genreName(game.genre)));
   meta.append(el('span', '', timeAgo(game.createdAt)));
-  if (game.remixOf) meta.append(el('span', 'tag', 'Remix'));
+  if (game.playCount) meta.append(el('span', '', `Played ${game.playCount}×`));
+  if ((game.versions?.length ?? 1) > 1) meta.append(el('span', 'tag', `v${game.versions!.length}`));
+  else if (game.remixOf) meta.append(el('span', 'tag', 'Remix'));
   body.append(titleRow, prompt, meta);
 
   const buttons = el('div', 'actions');
@@ -83,9 +95,22 @@ function card(game: SavedGame, active: boolean, actions: LibraryActions): HTMLLI
   return li;
 }
 
-export function renderLibrary(list: HTMLElement, games: SavedGame[], activeId: string | undefined, actions: LibraryActions): void {
+export function renderLibrary(
+  list: HTMLElement,
+  games: SavedGame[],
+  activeId: string | undefined,
+  actions: LibraryActions,
+  empty?: { message: string; action?: { label: string; run: () => void } },
+): void {
   if (games.length === 0) {
-    list.replaceChildren(el('li', 'empty', 'No games yet. Describe one above to get started.'));
+    const li = el('li', 'empty', empty?.message ?? 'No games yet. Describe one above to get started.');
+    if (empty?.action) {
+      const b = el('button', 'ghost', empty.action.label);
+      b.type = 'button';
+      b.addEventListener('click', empty.action.run);
+      li.append(el('br'), b);
+    }
+    list.replaceChildren(li);
     return;
   }
   list.replaceChildren(...games.map((game) => card(game, game.id === activeId, actions)));

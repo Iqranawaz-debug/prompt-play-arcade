@@ -4,7 +4,9 @@ import './styles/components.css';
 import './styles/overlays.css';
 import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, fetchHealth, generateGame } from './api';
-import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './db';
+import { addGame, deleteGame, listGames, markPlayed, seedIfEmpty, setFavorite, type SavedGame } from './db';
+import { GENRES } from './genre';
+import { SORTS, filterCounts, queryGames, type LibraryFilter, type LibraryQuery, type LibrarySort } from './libraryQuery';
 import { exportGame } from './export';
 import { startAmbient } from './ambient';
 import { createSettingsDrawer } from './drawer';
@@ -75,6 +77,7 @@ let lastScore = 0;
 function showGameStatus(s: GameStatus | 'loading' | undefined): void {
   const phase = s === undefined ? 'idle' : s === 'loading' ? 'loading' : s.phase;
   gameStatus.dataset.phase = phase;
+  currentPhase = phase;
   gameStatus.textContent = PHASE_LABEL[phase];
   libraryList.querySelector('.game.active')?.setAttribute('data-phase', phase);
   gameStats.hidden = typeof s !== 'object';
@@ -127,20 +130,104 @@ function updateCounter(): void {
   form.classList.toggle('has-prompt', promptBox.value.trim().length >= 3);
 }
 
-/** Latest library contents, for the command palette. */
+/** Latest library contents (unfiltered), also used by the command palette. */
 let allGames: SavedGame[] = [];
 
-async function refreshLibrary(): Promise<void> {
-  const games = await listGames();
-  allGames = games;
-  libraryCount.textContent = games.length === 1 ? '1 game' : `${games.length} games`;
-  renderLibrary(libraryList, games, activeId, { play, remix, exportHtml, remove });
+// ---------- Smart library: search, filters, sort (remembered per browser) ----------
+const librarySearch = $<HTMLInputElement>('library-search');
+const librarySort = $<HTMLSelectElement>('library-sort');
+const libraryFilters = $('library-filters');
+const LIBRARY_KEY = 'gg.library.v1';
+const FILTERS: { id: LibraryFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'favorites', label: '★ Favorites' },
+  { id: 'recent', label: 'Recently played' },
+  ...GENRES.map((g) => ({ id: g.id as LibraryFilter, label: g.name })),
+];
+const libQuery: LibraryQuery = (() => {
+  const fallback: LibraryQuery = { search: '', filter: 'all', sort: 'newest' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '{}') as Partial<LibraryQuery>;
+    return {
+      search: '',
+      filter: FILTERS.some((f) => f.id === saved.filter) ? saved.filter! : fallback.filter,
+      sort: SORTS.some((x) => x.id === saved.sort) ? saved.sort! : fallback.sort,
+    };
+  } catch {
+    return fallback;
+  }
+})();
+librarySort.append(...SORTS.map((x) => new Option(x.name, x.id)));
+librarySort.value = libQuery.sort;
+
+function setLibQuery(patch: Partial<LibraryQuery>): void {
+  Object.assign(libQuery, patch);
+  try {
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify({ filter: libQuery.filter, sort: libQuery.sort }));
+  } catch {
+    // not persisted; still applies now
+  }
+  renderLibraryView();
 }
+
+let currentPhase = 'idle';
+
+function renderLibraryView(): void {
+  const shown = queryGames(allGames, libQuery);
+  const counts = filterCounts(allGames, libQuery.search);
+  const filtered = libQuery.search.trim() !== '' || libQuery.filter !== 'all';
+  libraryCount.textContent = filtered ? `${shown.length} of ${allGames.length}` : allGames.length === 1 ? '1 game' : `${allGames.length} games`;
+
+  libraryFilters.replaceChildren(
+    ...FILTERS.map((f) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = f.label;
+      const count = document.createElement('span');
+      count.className = 'count';
+      count.textContent = String(counts[f.id] ?? 0);
+      b.append(count);
+      b.setAttribute('aria-pressed', String(libQuery.filter === f.id));
+      b.disabled = (counts[f.id] ?? 0) === 0 && libQuery.filter !== f.id && f.id !== 'all';
+      b.addEventListener('click', () => setLibQuery({ filter: f.id }));
+      return b;
+    }),
+  );
+
+  renderLibrary(
+    libraryList,
+    shown,
+    activeId,
+    { play, remix, exportHtml, remove, toggleFavorite },
+    allGames.length > 0
+      ? { message: 'No games match your search and filters.', action: { label: 'Clear filters', run: () => ((librarySearch.value = ''), setLibQuery({ search: '', filter: 'all' })) } }
+      : undefined,
+  );
+  libraryList.querySelector('.game.active')?.setAttribute('data-phase', currentPhase);
+}
+
+async function refreshLibrary(): Promise<void> {
+  allGames = await listGames();
+  renderLibraryView();
+}
+
+async function toggleFavorite(game: SavedGame): Promise<void> {
+  await setFavorite(game.id, !game.favorite);
+  await refreshLibrary();
+}
+
+let searchTimer: number | undefined;
+librarySearch.addEventListener('input', () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => setLibQuery({ search: librarySearch.value }), 80);
+});
+librarySort.addEventListener('change', () => setLibQuery({ sort: librarySort.value as LibrarySort }));
 
 async function play(game: SavedGame): Promise<void> {
   activeId = game.id;
   setStageInfo(game);
   showStageError();
+  await markPlayed(game.id);
   await refreshLibrary();
   libraryList.querySelector('.game.active')?.scrollIntoView({ block: 'nearest' });
   try {
@@ -231,7 +318,7 @@ form.addEventListener('submit', async (e) => {
       },
     });
     const game = base
-      ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, base.id)
+      ? await addGame(`Remix of "${base.title}": ${prompt}`, spec, { remixOf: base.id })
       : await addGame(prompt, spec);
     genNote.textContent = `Created "${spec.title}"${attempts > 1 ? ` after ${attempts} attempts` : ''}.`;
     notify('success', base ? 'Remix ready' : 'Game generated successfully', `"${spec.title}" is ready to play.`);
@@ -310,12 +397,20 @@ function commands(): Command[] {
       run: () => current && remix(current),
     },
     {
-      id: 'library', group: 'Navigate', title: 'Open library', keywords: 'games list browse',
+      id: 'library', group: 'Navigate', title: 'Open library', hint: 'Search', keywords: 'games list browse search find',
       run: () => {
-        const first = libraryList.querySelector<HTMLButtonElement>('.game button.primary');
         libraryList.scrollTo({ top: 0, behavior: 'smooth' });
-        first?.focus();
+        librarySearch.focus();
+        librarySearch.select();
       },
+    },
+    {
+      id: 'favorites', group: 'Navigate', title: 'Show favorite games', keywords: 'star starred library',
+      run: () => setLibQuery({ filter: 'favorites' }),
+    },
+    {
+      id: 'recent', group: 'Navigate', title: 'Show recently played games', keywords: 'history library last',
+      run: () => setLibQuery({ filter: 'recent' }),
     },
     { id: 'notifications', group: 'Navigate', title: 'Show notifications', keywords: 'bell alerts', run: () => $('open-notifications').click() },
     { id: 'settings', group: 'Settings', title: 'Manage settings', hint: 'Customize', keywords: 'preferences options customize', run: () => settingsDrawer.open() },
