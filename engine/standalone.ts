@@ -1,6 +1,7 @@
 import { ZodError } from 'zod';
 import { formatIssues } from '../spec/schema';
 import { runGame } from './index';
+import type { GameStatus } from './status';
 
 declare global {
   interface Window {
@@ -9,7 +10,7 @@ declare global {
 }
 
 /** Messages the sandboxed game sends to the app that embeds it. */
-type FrameEvent = { type: 'ready' } | { type: 'error'; message: string };
+type FrameEvent = { type: 'ready' } | { type: 'error'; message: string } | { type: 'status'; status: GameStatus };
 export type FrameMessage = FrameEvent & { source: 'game-frame' };
 
 function post(msg: FrameEvent): void {
@@ -22,7 +23,7 @@ const describe = (err: unknown) =>
 window.addEventListener('error', (e) => post({ type: 'error', message: e.message }));
 
 const parent = document.getElementById('game')!;
-runGame(window.__GAME_SPEC__, parent)
+runGame(window.__GAME_SPEC__, parent, { onStatus: (status) => post({ type: 'status', status }) })
   .then(() => post({ type: 'ready' }))
   .catch((err: unknown) => {
     parent.textContent = describe(err);

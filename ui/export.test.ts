@@ -28,3 +28,15 @@ describe('timeAgo', () => {
     expect(timeAgo(now - 2 * 86_400_000, now)).toBe('2d ago');
   });
 });
+
+describe('generation progress', () => {
+  it('moves forward through the phases and creeps while waiting', async () => {
+    const { progressFor, creep } = await import('./status');
+    const gen = progressFor({ phase: 'generating', attempt: 1 });
+    const val = progressFor({ phase: 'validating', attempt: 1 });
+    expect(gen.from).toBeLessThan(val.from);
+    expect(creep(gen, 0)).toBe(gen.from);
+    expect(creep(gen, 30_000)).toBeGreaterThan(gen.from);
+    expect(creep(gen, 1e9)).toBeCloseTo(gen.cap);
+  });
+});

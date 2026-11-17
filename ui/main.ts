@@ -5,10 +5,12 @@ import type { GameSpec } from '../spec/schema';
 import { GenerateFailure, fetchHealth, generateGame } from './api';
 import { addGame, deleteGame, listGames, seedIfEmpty, type SavedGame } from './db';
 import { exportGame } from './export';
+import { startAmbient } from './ambient';
 import { setButtonLabel } from './icons';
 import { renderLibrary } from './library';
 import { GamePlayer } from './player';
-import { StatusBox, describeProgress } from './status';
+import type { GameStatus } from '../engine/status';
+import { StatusBox, describeProgress, progressFor } from './status';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -35,7 +37,7 @@ const stageEmpty = $('stage-empty');
 const frameWrap = $('frame-wrap');
 const ideaChips = [...document.querySelectorAll<HTMLButtonElement>('#idea-chips button')];
 
-const status = new StatusBox($('gen-status-box'), $('gen-phase'), $('gen-detail'));
+const status = new StatusBox($('gen-status-box'), $('gen-phase'), $('gen-detail'), $('gen-progress'));
 const DEFAULT_PLACEHOLDER = promptBox.placeholder;
 let activeId: string | undefined;
 /** When set, the prompt box describes changes to this game instead of a new idea. */
@@ -55,9 +57,40 @@ function showStageError(message?: string): void {
   stageError.textContent = message ?? '';
 }
 
+const gameStatus = $('game-status');
+const gameStats = $('game-stats');
+const statScore = $('stat-score');
+const statTarget = $('stat-target');
+const statLivesFull = $('stat-lives-full');
+const statLivesEmpty = $('stat-lives-empty');
+const PHASE_LABEL = { idle: 'Idle', loading: 'Loading', intro: 'Ready', playing: 'Live', won: 'Won', lost: 'Game over' } as const;
+let lastScore = 0;
+
+/** Live HUD badges above the preview, fed by the running game (see engine/status.ts). */
+function showGameStatus(s: GameStatus | 'loading' | undefined): void {
+  const phase = s === undefined ? 'idle' : s === 'loading' ? 'loading' : s.phase;
+  gameStatus.dataset.phase = phase;
+  gameStatus.textContent = PHASE_LABEL[phase];
+  libraryList.querySelector('.game.active')?.setAttribute('data-phase', phase);
+  gameStats.hidden = typeof s !== 'object';
+  if (typeof s !== 'object') return;
+  statScore.textContent = String(s.score);
+  statTarget.textContent = s.target !== undefined ? ` / ${s.target}` : '';
+  statLivesFull.textContent = '♥'.repeat(s.lives);
+  statLivesEmpty.textContent = '♥'.repeat(Math.max(0, s.maxLives - s.lives));
+  if (s.score > lastScore) {
+    // Restart the bump animation on each gain.
+    gameStats.classList.remove('bump');
+    void gameStats.offsetWidth;
+    gameStats.classList.add('bump');
+  }
+  lastScore = s.score;
+}
+
 const player = new GamePlayer($('stage-frame'), {
   onReady: () => showStageError(),
   onError: (message) => showStageError(message),
+  onStatus: (s) => showGameStatus(s),
 });
 
 /** Keep the preview chrome in step with the player: buttons, empty state, glow and heading. */
@@ -81,6 +114,7 @@ function updateCounter(): void {
   const n = promptBox.value.length;
   promptCounter.textContent = `${n} / ${promptBox.maxLength}`;
   promptCounter.classList.toggle('near-limit', n > promptBox.maxLength * 0.9);
+  form.classList.toggle('has-prompt', promptBox.value.trim().length >= 3);
 }
 
 async function refreshLibrary(): Promise<void> {
@@ -96,7 +130,10 @@ async function play(game: SavedGame): Promise<void> {
   await refreshLibrary();
   libraryList.querySelector('.game.active')?.scrollIntoView({ block: 'nearest' });
   try {
+    lastScore = 0;
     await player.play(game.spec);
+    // play() resolves once the frame is inserted, before the game inside it can report its first status.
+    showGameStatus('loading');
   } catch (err) {
     showStageError((err as Error).message);
   }
@@ -173,7 +210,7 @@ form.addEventListener('submit', async (e) => {
       signal: controller.signal,
       onStatus: (p) => {
         const { phase, detail } = describeProgress(p, modelName);
-        status.set(phase, detail);
+        status.set(phase, detail, progressFor(p));
       },
     });
     const game = base
@@ -224,6 +261,15 @@ for (const chip of ideaChips) {
 }
 
 async function init(): Promise<void> {
+  startAmbient($<HTMLCanvasElement>('ambient-stars'));
+  // The 3D controller is code-split: Three.js loads in the background after the UI is up.
+  import('./controller3d')
+    .then(({ mountController }) => {
+      if (mountController($('empty-3d'))) $('empty-3d').parentElement!.classList.add('has-3d');
+    })
+    .catch(() => {
+      /* keep the SVG illustration */
+    });
   syncStageButtons();
   setStageInfo();
   updateCounter();

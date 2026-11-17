@@ -1,4 +1,5 @@
 import type { SavedGame } from './db';
+import { renderCover } from './cover';
 import { ICONS, iconButton, setButtonLabel } from './icons';
 
 export interface LibraryActions {
@@ -54,13 +55,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text?
 function card(game: SavedGame, active: boolean, actions: LibraryActions): HTMLLIElement {
   const li = el('li', active ? 'game active' : 'game');
   if (active) li.setAttribute('aria-current', 'true');
-  const { theme } = game.spec;
-  li.style.setProperty('--thumb-bg', theme.background);
-  li.style.setProperty('--thumb-a', theme.primary);
-  li.style.setProperty('--thumb-b', theme.accent);
-
-  const thumb = el('div', 'game-thumb');
-  thumb.setAttribute('aria-hidden', 'true');
+  const thumb = renderCover(game.spec);
 
   const body = el('div', 'game-body info');
   const titleRow = el('div', 'title-row');

@@ -50,24 +50,37 @@ h1, h2, h3, p { margin: 0; }
   min-height: 0;
 }
 
-/* ---------- Sidebar: the one real glass panel ---------- */
+/* ---------- Sidebar: two floating glass panels ---------- */
 .sidebar {
   position: sticky; top: 0;
   height: 100%; min-height: 0;
-  display: flex; flex-direction: column;
-  padding: var(--s-4);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.panel { padding: var(--s-4); }
+.composer-panel { flex: none; }
+.library-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.library-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--s-3); }
+
+/* Frosted glass: blur, thin bright edge, a soft diagonal reflection and a highlight along the top. */
+.glass {
+  position: relative;
   border-radius: var(--r-xl);
-  background: var(--glass);
-  backdrop-filter: blur(18px) saturate(140%);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg), var(--highlight);
+  background:
+    linear-gradient(160deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.015) 45%, rgb(255 255 255 / 0.01)),
+    var(--glass);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgb(255 255 255 / 0.07);
 }
-.composer { flex: none; }
-.library-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin: var(--s-5) 0 var(--s-3); padding-top: var(--s-4);
-  border-top: 1px solid var(--border);
+.glass::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(118deg, rgb(255 255 255 / 0.08) 0%, rgb(255 255 255 / 0) 26%);
 }
+.glass::after {
+  content: ''; position: absolute; top: -1px; left: 18%; right: 18%; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+}
+.glass > * { position: relative; }
 .library-count { font-size: var(--fs-xs); color: var(--text-3); }
 
 /* ---------- Preview workspace ---------- */
@@ -83,7 +96,8 @@ h1, h2, h3, p { margin: 0; }
   overflow: hidden;
 }
 .stage-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex: none; min-height: var(--h-md); }
-.stage-heading { display: grid; min-width: 0; }
+/* The heading yields space (its subtitle truncates) so the toolbar always stays on one row. */
+.stage-heading { display: grid; flex: 1 1 auto; min-width: 0; }
 .stage-heading h2 { font-size: var(--fs-lg); font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-sub { font-size: var(--fs-xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-actions { display: flex; gap: var(--s-2); flex: none; }
@@ -132,8 +146,22 @@ h1, h2, h3, p { margin: 0; }
   body { height: auto; min-height: 100dvh; overflow: auto; grid-template-rows: var(--header-h) auto; }
   .layout { grid-template-columns: 1fr; padding: var(--s-3); gap: var(--s-3); }
   .sidebar { position: static; height: auto; }
+  .library-panel { flex: none; }
   .library { max-height: 45vh; }
   .stage-fit { container-type: normal; display: block; }
+  .stage-bar { flex-wrap: wrap; }
   .frame-wrap { width: 100%; }
   .brand-tagline { display: none; }
 }
+
+/* ---------- Ambient background: drifting orbs + starfield canvas (ui/ambient.ts) ---------- */
+.ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.topbar, .layout { position: relative; z-index: 1; }
+#ambient-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+.orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.32; will-change: transform; }
+.orb-a { width: 46vmax; height: 46vmax; left: -12vmax; top: -16vmax; background: radial-gradient(circle, rgb(255 138 61 / 0.55), transparent 65%); animation: orb-a 46s ease-in-out infinite alternate; }
+.orb-b { width: 52vmax; height: 52vmax; right: -18vmax; top: 10vmax; background: radial-gradient(circle, rgb(143 128 245 / 0.6), transparent 65%); animation: orb-b 58s ease-in-out infinite alternate; }
+.orb-c { width: 38vmax; height: 38vmax; left: 30vmax; bottom: -22vmax; background: radial-gradient(circle, rgb(91 141 239 / 0.5), transparent 65%); animation: orb-c 52s ease-in-out infinite alternate; }
+@keyframes orb-a { to { transform: translate(14vmax, 10vmax) scale(1.12); } }
+@keyframes orb-b { to { transform: translate(-16vmax, 8vmax) scale(0.92); } }
+@keyframes orb-c { to { transform: translate(-10vmax, -12vmax) scale(1.1); } }

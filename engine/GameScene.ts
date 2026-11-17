@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
 import { SoundFx, collisionSound } from './audio';
+import type { GameStatus } from './status';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, popScore, quoteBubble, showOverlay, toast, type HudState } from './ui';
@@ -31,6 +32,8 @@ export class GameScene extends Phaser.Scene {
   private readonly entityById: Map<string, EntitySpec>;
 
   private phase: Phase = 'intro';
+  private won = false;
+  private lastStatusKey = '';
   private score = 0;
   private scoreCarry = 0;
   private lives = 0;
@@ -43,6 +46,8 @@ export class GameScene extends Phaser.Scene {
     private readonly sfx: SoundFx = new SoundFx(),
     /** Real pixels per logical pixel; the camera zooms by this so the 960x540 world fills a sharper canvas. */
     private readonly zoom = 1,
+    /** Told whenever the phase, score or lives change (the dashboard shows it as live badges). */
+    private readonly onStatus: (status: GameStatus) => void = () => {},
   ) {
     super('game');
     this.entityById = new Map(spec.entities.map((e) => [e.id, e]));
@@ -51,6 +56,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     const { spec } = this;
     this.phase = 'intro';
+    this.won = false;
     this.score = 0;
     this.scoreCarry = 0;
     this.lives = spec.player.lives;
@@ -89,6 +95,7 @@ export class GameScene extends Phaser.Scene {
 
   private startRound(): void {
     this.phase = 'playing';
+    this.reportStatus();
     this.physics.resume();
     this.sfx.unlock();
     this.sfx.play('start');
@@ -228,6 +235,8 @@ export class GameScene extends Phaser.Scene {
 
   private endRound(won: boolean): void {
     this.phase = 'over';
+    this.won = won;
+    this.reportStatus();
     this.physics.pause();
     this.time.removeAllEvents();
     this.sfx.play(won ? 'win' : 'lose');
@@ -247,7 +256,24 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  /** Report phase/score/lives to the embedder, only when something changed. */
+  private reportStatus(): void {
+    const { spec } = this;
+    const status: GameStatus = {
+      phase: this.phase === 'over' ? (this.won ? 'won' : 'lost') : this.phase,
+      score: this.score,
+      target: spec.win.type === 'score' ? spec.win.target : undefined,
+      lives: Math.max(0, this.lives),
+      maxLives: Math.max(spec.player.lives, this.lives),
+    };
+    const key = `${status.phase}|${status.score}|${status.lives}|${status.maxLives}`;
+    if (key === this.lastStatusKey) return;
+    this.lastStatusKey = key;
+    this.onStatus(status);
+  }
+
   private refreshHud(): void {
+    this.reportStatus();
     const { spec } = this;
     const secs = this.elapsedMs / 1000;
     let timer: HudState['timer'];

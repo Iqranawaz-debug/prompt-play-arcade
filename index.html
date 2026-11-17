@@ -11,6 +11,12 @@
     />
   </head>
   <body>
+    <div class="ambient" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+      <canvas id="ambient-stars"></canvas>
+    </div>
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">
@@ -29,6 +35,7 @@
 
     <main class="layout">
       <aside class="sidebar" aria-label="Create and library">
+        <section class="glass panel composer-panel" aria-label="Create a game">
         <form id="gen-form" class="composer">
           <div id="remix-banner" class="remix-banner" hidden>
             <span id="remix-label"></span>
@@ -67,6 +74,7 @@
               <span id="gen-detail"></span>
             </div>
             <button id="gen-cancel" type="button">Cancel</button>
+            <span class="progress" aria-hidden="true"><span id="gen-progress" class="progress-fill"></span></span>
           </div>
 
           <div id="gen-error" class="alert" role="alert" hidden>
@@ -77,21 +85,36 @@
             <button id="gen-error-close" type="button" class="close" aria-label="Dismiss error">×</button>
           </div>
         </form>
+        </section>
 
-        <div class="library-head">
-          <h2 class="section-title">Library</h2>
-          <span id="library-count" class="library-count"></span>
-        </div>
-        <ul id="library" class="library"></ul>
+        <section class="glass panel library-panel" aria-labelledby="library-title">
+          <div class="library-head">
+            <h2 id="library-title" class="section-title">Library</h2>
+            <span id="library-count" class="library-count"></span>
+          </div>
+          <ul id="library" class="library"></ul>
+        </section>
       </aside>
 
       <section class="stage" aria-labelledby="stage-title">
         <div class="stage-bar">
           <div class="stage-heading">
-            <h2 id="stage-title">No game selected</h2>
+            <div class="stage-title-row">
+              <h2 id="stage-title">No game selected</h2>
+              <span id="game-status" class="live-status" data-phase="idle" role="status" aria-live="polite">Idle</span>
+            </div>
             <span id="stage-sub" class="stage-sub">Preview</span>
           </div>
           <div class="stage-actions">
+            <div id="game-stats" class="game-stats" hidden>
+              <span class="stat" title="Score">
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+                </svg>
+                <b id="stat-score">0</b><span id="stat-target" class="muted"></span>
+              </span>
+              <span class="stat hearts" title="Lives"><span id="stat-lives-full" class="full"></span><span id="stat-lives-empty" class="empty"></span></span>
+            </div>
             <button id="restart" type="button" class="btn-md" disabled>
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
@@ -113,6 +136,7 @@
 
             <div id="stage-empty" class="empty-state">
               <div class="empty-inner">
+                <div id="empty-3d" class="empty-3d" aria-hidden="true"></div>
                 <svg class="empty-art" viewBox="0 0 220 150" aria-hidden="true">
                   <defs>
                     <linearGradient id="eg-body" x1="0" y1="0" x2="1" y2="1">

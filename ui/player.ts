@@ -1,10 +1,13 @@
 import type { FrameMessage } from '../engine/standalone';
+import { isGameStatus, type GameStatus } from '../engine/status';
 import type { GameSpec } from '../spec/schema';
 import { buildGameHtml, loadEngineSource } from './gameHtml';
 
 export interface PlayerCallbacks {
   onReady(): void;
   onError(message: string): void;
+  /** Live phase/score/lives from the running game; undefined when no game is loaded. */
+  onStatus?(status: GameStatus | undefined): void;
 }
 
 /** Hosts games in a sandboxed iframe: scripts only, opaque origin, no access to this app. */
@@ -21,6 +24,7 @@ export class GamePlayer {
       if (!this.frame || e.source !== this.frame.contentWindow || e.data?.source !== 'game-frame') return;
       if (e.data.type === 'ready') this.callbacks.onReady();
       else if (e.data.type === 'error') this.callbacks.onError(String(e.data.message));
+      else if (e.data.type === 'status' && isGameStatus(e.data.status)) this.callbacks.onStatus?.(e.data.status);
     });
   }
 
@@ -51,6 +55,7 @@ export class GamePlayer {
     this.frame?.remove();
     this.frame = undefined;
     this.spec = undefined;
+    this.callbacks.onStatus?.(undefined);
   }
 
   get isFullscreen(): boolean {
