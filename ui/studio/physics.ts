@@ -1,4 +1,4 @@
-import { GameSpecSchema, MIN_JUMP_TILES, formatIssues, type GameSpec } from '../../spec/schema';
+import { GameSpecSchema, MIN_JUMP_TILES, formatIssues, levelsOf, type GameSpec } from '../../spec/schema';
 import { DEFAULT_TILE, PLATFORMER_PHYSICS, jumpHeight, parseLevel } from '../../spec/level';
 import { makePlatformer } from '../../spec/platformer';
 import { h } from '../modal';
@@ -21,8 +21,9 @@ function mapPreview(spec: GameSpec): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = spec.theme.background;
   ctx.fillRect(0, 0, 480, 248);
-  if (!spec.level) return canvas;
-  const g = parseLevel(spec.level);
+  const level = levelsOf(spec)[0];
+  if (!level) return canvas;
+  const g = parseLevel(level);
   const s = g.tile / 2;
   for (let r = 0; r < g.rows; r++) {
     for (let c = 0; c < g.cols; c++) {
@@ -93,7 +94,7 @@ export function createPhysicsSettings(host: HTMLElement, ctx: StudioContext) {
         return;
       }
       const q = draft.physics ?? p;
-      const tile = draft.level?.tileSize ?? DEFAULT_TILE;
+      const tile = levelsOf(draft)[0]?.tileSize ?? DEFAULT_TILE;
       const height = jumpHeight(q.jump, q.gravity);
       const ok = q.gravity >= 200 && height >= MIN_JUMP_TILES * tile;
       jumpInfo.textContent = q.gravity < 200 ? 'Gravity must be at least 200 for a platformer.' : `Jump height ${Math.round(height)}px (${(height / tile).toFixed(1)} tiles)${ok ? '' : ` - needs ${MIN_JUMP_TILES} tiles`}`;
@@ -106,10 +107,11 @@ export function createPhysicsSettings(host: HTMLElement, ctx: StudioContext) {
     };
 
     const levelTools = h('div', { class: 'tool-actions' });
-    if (draft.level) {
+    if (levelsOf(draft).length) {
       const remove = h('button', { type: 'button', class: 'ghost', textContent: 'Remove level map' });
       remove.addEventListener('click', () => {
         draft.level = undefined;
+        draft.levels = undefined;
         for (const s of draft.spawns) if (s.edge === 'platforms') s.edge = 'anywhere';
         render();
       });
@@ -141,7 +143,7 @@ export function createPhysicsSettings(host: HTMLElement, ctx: StudioContext) {
         jumpInfo,
         h('div', { class: 'tool-actions' }, reset),
       ),
-      h('section', { class: 'sb-section' }, h('h3', { textContent: draft.level ? 'Level' : 'Level (none)' }), mapPreview(draft), levelTools),
+      h('section', { class: 'sb-section' }, h('h3', { textContent: levelsOf(draft).length > 1 ? `Level 1 of ${levelsOf(draft).length}` : levelsOf(draft).length ? 'Level' : 'Level (none)' }), mapPreview(draft), levelTools),
       err,
     );
 

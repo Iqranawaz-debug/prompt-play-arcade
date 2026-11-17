@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { EntitySpec, GameSpec, SpawnSpec } from '../spec/schema';
+import { levelsOf, type EntitySpec, type GameSpec, type SpawnSpec } from '../spec/schema';
 import { SoundFx, collisionSound } from './audio';
 import { Controls } from './controls';
 import { Music } from './music';
@@ -47,6 +47,10 @@ export class GameScene extends Phaser.Scene {
   private readonly music: Music;
   private invulnerableUntil = 0;
   private level?: Level;
+  /** Which level is being played, and what carries over between levels. */
+  private levelIndex = 0;
+  private carriedLives?: number;
+  private carriedScore = 0;
   private animator!: Animator;
   private groundedAt = -Infinity;
   private jumpPressedAt = -Infinity;
@@ -79,13 +83,24 @@ export class GameScene extends Phaser.Scene {
     return `Click or press ${keyLabel(this.controls.firstKey('start'))} to ${verb}`;
   }
 
+  /** Phaser passes restart data here; a plain restart (play again) starts over from level 1. */
+  init(data: { levelIndex?: number; lives?: number; total?: number } = {}): void {
+    this.levelIndex = data.levelIndex ?? 0;
+    this.carriedLives = data.lives;
+    this.carriedScore = data.total ?? 0;
+  }
+
+  private get levelCount(): number {
+    return Math.max(1, levelsOf(this.spec).length);
+  }
+
   create(): void {
     const { spec } = this;
     this.phase = 'intro';
     this.won = false;
     this.score = 0;
     this.scoreCarry = 0;
-    this.lives = spec.player.lives;
+    this.lives = this.carriedLives ?? spec.player.lives;
     this.elapsedMs = 0;
     this.invulnerableUntil = 0;
     this.groundedAt = this.jumpPressedAt = -Infinity;
@@ -96,7 +111,7 @@ export class GameScene extends Phaser.Scene {
     // The player and walls live in the field below the HUD bar, so the HUD never covers gameplay.
     this.physics.world.setBounds(FIELD.x, FIELD.y, FIELD.w, FIELD.h);
 
-    this.level = buildLevel(this, spec);
+    this.level = buildLevel(this, spec, levelsOf(spec)[this.levelIndex]);
     this.animator = new Animator(this);
 
     const def = spec.sprites[spec.player.sprite];
@@ -122,7 +137,15 @@ export class GameScene extends Phaser.Scene {
     showOverlay(
       this,
       spec.theme,
-      { eyebrow: 'Ready to play', title: spec.title, body: spec.messages.intro, cta: this.cta('start') },
+      this.levelIndex === 0
+        ? { eyebrow: this.levelCount > 1 ? `Level 1 of ${this.levelCount}` : 'Ready to play', title: spec.title, body: spec.messages.intro, cta: this.cta('start') }
+        : {
+            eyebrow: `Level ${this.levelIndex + 1} of ${this.levelCount}`,
+            title: levelsOf(spec)[this.levelIndex]?.name ?? `Level ${this.levelIndex + 1}`,
+            body: 'Same goal, new layout. Good luck!',
+            stat: { value: String(this.carriedScore), label: `total ${spec.score.label.toLowerCase()}` },
+            cta: this.cta('continue'),
+          },
       () => this.startRound(),
       this.controls,
     );
@@ -341,6 +364,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endRound(won: boolean): void {
+    if (won && this.levelIndex < this.levelCount - 1) return this.nextLevel();
     this.phase = 'over';
     this.won = won;
     this.reportStatus();
@@ -356,11 +380,37 @@ export class GameScene extends Phaser.Scene {
         eyebrow: spec.title,
         title: won ? 'You win!' : 'Game over',
         body: won ? spec.messages.win : spec.messages.lose,
-        stat: { value: String(this.score), label: spec.score.label },
+        stat: { value: String(this.carriedScore + this.score), label: spec.score.label },
         cta: this.cta('play again'),
         tone: won ? 'win' : 'lose',
       },
       () => this.scene.restart(),
+      this.controls,
+    );
+  }
+
+  /** Level cleared with more to go: celebrate, then restart the scene on the next map, keeping lives and score. */
+  private nextLevel(): void {
+    this.phase = 'intro'; // between levels: the dashboard shows Ready, not a finished game
+    this.reportStatus();
+    this.music.stop();
+    this.physics.pause();
+    this.time.removeAllEvents();
+    this.sfx.play('big');
+    const next = this.levelIndex + 1;
+    const total = this.carriedScore + this.score;
+    showOverlay(
+      this,
+      this.spec.theme,
+      {
+        eyebrow: `Level ${this.levelIndex + 1} cleared`,
+        title: levelsOf(this.spec)[next]?.name ?? `Level ${next + 1}`,
+        body: `On to level ${next + 1} of ${this.levelCount}.`,
+        stat: { value: String(total), label: `total ${this.spec.score.label.toLowerCase()}` },
+        cta: this.cta('continue'),
+        tone: 'win',
+      },
+      () => this.scene.restart({ levelIndex: next, lives: this.lives, total }),
       this.controls,
     );
   }
@@ -370,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     const { spec } = this;
     const status: GameStatus = {
       phase: this.phase === 'over' ? (this.won ? 'won' : 'lost') : this.phase,
-      score: this.score,
+      score: this.phase === 'over' ? this.carriedScore + this.score : this.score, // finished games report the total over all levels
       target: spec.win.type === 'score' ? spec.win.target : undefined,
       lives: Math.max(0, this.lives),
       maxLives: Math.max(spec.player.lives, this.lives),

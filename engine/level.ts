@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { GameSpec } from '../spec/schema';
+type LevelDef = NonNullable<GameSpec['level']>;
 import { isWall, parseLevel, platformTops, wallRuns, type Grid } from '../spec/level';
 import { mix } from './colors';
 import type { Vec } from './motion';
@@ -18,9 +19,9 @@ const tileX = (g: Grid, col: number) => FIELD.x + col * g.tile;
 const tileY = (g: Grid, row: number) => FIELD.y + row * g.tile;
 
 /** Draw the tile map and create one static physics body per horizontal run of walls. */
-export function buildLevel(scene: Phaser.Scene, spec: GameSpec): Level | undefined {
-  if (!spec.level) return undefined;
-  const g = parseLevel(spec.level);
+export function buildLevel(scene: Phaser.Scene, spec: GameSpec, def: LevelDef | undefined): Level | undefined {
+  if (!def) return undefined;
+  const g = parseLevel(def);
   const { theme } = spec;
   const art = scene.add.graphics().setDepth(2);
   const fill = Phaser.Display.Color.HexStringToColor(mix(theme.background, theme.primary, 0.35)).color;
