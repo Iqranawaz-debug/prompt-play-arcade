@@ -36,6 +36,9 @@ export async function runGame(input: unknown, parent: HTMLElement, options: RunO
     physics: { default: 'arcade', arcade: { debug: false } },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     banner: false,
+    // The host page decides when the game gets keyboard focus; Phaser's own boot-time window.focus() would
+    // otherwise pull focus into the frame at an arbitrary moment (e.g. while the user types in a dialog).
+    autoFocus: false,
     audio: { noAudio: true }, // sounds come from our own Web Audio synth
     scene: [new GameScene(spec, canvases, sfx, zoom, options.onStatus)],
   });

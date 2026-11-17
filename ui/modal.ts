@@ -4,7 +4,10 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
 
 export interface Modal {
   open(): void;
-  close(): void;
+  /** Close; pass `{ restoreFocus: false }` when the caller decides where focus goes next. */
+  close(options?: { restoreFocus?: boolean }): void;
+  /** Put focus back where it was before opening (used when a command left focus nowhere). */
+  returnFocus(): void;
   readonly isOpen: boolean;
 }
 
@@ -52,9 +55,14 @@ export function createModal(panel: HTMLElement, options: { onOpen?: () => void; 
       document.documentElement.classList.add('modal-open');
       panel.addEventListener('keydown', onKey);
       options.onOpen?.();
-      requestAnimationFrame(() => (options.initialFocus?.() ?? panel.querySelector<HTMLElement>(FOCUSABLE))?.focus());
+      const focusFirst = () => (options.initialFocus?.() ?? panel.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+      requestAnimationFrame(focusFirst);
+      // Focus moving into a sandboxed game frame completes asynchronously and can land after ours; re-check once.
+      window.setTimeout(() => {
+        if (open && !panel.contains(document.activeElement)) focusFirst();
+      }, 120);
     },
-    close() {
+    close({ restoreFocus = true } = {}) {
       if (!open) return;
       open = false;
       openCount--;
@@ -63,6 +71,9 @@ export function createModal(panel: HTMLElement, options: { onOpen?: () => void; 
       if (openCount === 0) document.documentElement.classList.remove('modal-open');
       panel.removeEventListener('keydown', onKey);
       options.onClose?.();
+      if (restoreFocus) returnTo?.focus?.();
+    },
+    returnFocus() {
       returnTo?.focus?.();
     },
   };

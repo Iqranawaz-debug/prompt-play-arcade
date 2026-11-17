@@ -45,7 +45,22 @@ export class GamePlayer {
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.title = spec.title;
     frame.srcdoc = html;
-    frame.addEventListener('load', () => frame.focus());
+    // Give the game keyboard focus when it loads, unless the user moved on while it was loading
+    // (clicked into a text field or opened a dialog) — then their focus is left alone.
+    let movedOn = false;
+    const onFocusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.closest('[role="dialog"]')) movedOn = true;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    frame.addEventListener(
+      'load',
+      () => {
+        document.removeEventListener('focusin', onFocusIn);
+        if (!movedOn && !document.documentElement.classList.contains('modal-open')) frame.focus();
+      },
+      { once: true },
+    );
     this.host.replaceChildren(frame);
     this.frame = frame;
     this.spec = spec;

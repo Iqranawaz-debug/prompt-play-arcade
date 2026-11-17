@@ -105,8 +105,10 @@ export function createCommandPalette(host: HTMLElement, getCommands: () => Comma
   const run = (i: number) => {
     const cmd = visible[i];
     if (!cmd || cmd.disabled) return;
-    modal.close();
+    // The command decides where focus goes (e.g. the prompt); only restore it if the command left it nowhere.
+    modal.close({ restoreFocus: false });
     cmd.run();
+    if (document.activeElement === document.body || document.activeElement === null) modal.returnFocus();
   };
 
   input.addEventListener('input', () => {
