@@ -2,11 +2,13 @@ import express, { type ErrorRequestHandler } from 'express';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { GameSpecSchema } from '../spec/schema';
+import { GameSpecSchema, SpriteSchema, formatIssues } from '../spec/schema';
 import { GameOptionsSchema } from '../spec/gameOptions';
 import { providerFromEnv } from '../generator/config';
 import { GenerationError, generateFromIdea, generateRemix, type GenerateEvent, type GenerateOptions } from '../generator/generate';
-import { ProviderError, isTransientStatus } from '../generator/providers';
+import { ProviderError, isTransientStatus, type ChatProvider } from '../generator/providers';
+import { AskError } from '../generator/ask';
+import { debugGame, makeCharacter, makeStoryboard, redrawSprite } from '../generator/tools';
 import { enhanceIdea } from '../generator/enhance';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
@@ -27,33 +29,63 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, provider: provider?.name ?? null, label: provider?.label ?? null });
 });
 
-const EnhanceBody = z.object({ prompt: z.string().trim().min(3).max(2000), options: GameOptionsSchema.optional() });
+/** Shared plumbing for the AI tool endpoints: provider check, input validation, cancel on disconnect, readable errors. */
+function toolRoute<B extends z.ZodType>(path: string, body: B, run: (data: z.infer<B>, p: ChatProvider, signal: AbortSignal) => Promise<unknown>): void {
+  app.post(path, async (req, res) => {
+    if (!provider) {
+      res.status(503).json({ error: 'No LLM provider configured. Copy .env.example to .env and set LLM_API_KEY.' });
+      return;
+    }
+    const parsed = body.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: `Invalid request:
+${formatIssues(parsed.error)}` });
+      return;
+    }
+    const cancel = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) cancel.abort(new Error('cancelled by client'));
+    });
+    const started = Date.now();
+    try {
+      res.json(await run(parsed.data, provider, cancel.signal));
+      console.log(`[${path}] ok in ${Date.now() - started}ms`);
+    } catch (err) {
+      if (cancel.signal.aborted) return;
+      const failure = describeFailure(err, provider.label);
+      console.error(`[${path}] failed:`, (err as Error).message);
+      const status = err instanceof ProviderError ? 502 : err instanceof AskError ? 422 : 500;
+      res.status(status).json({ error: failure.message, title: failure.title });
+    }
+  });
+}
+
+const Hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 /** Rewrite a short idea into a richer game description. */
-app.post('/api/enhance', async (req, res) => {
-  if (!provider) {
-    res.status(503).json({ error: 'No LLM provider configured. Copy .env.example to .env and set LLM_API_KEY.' });
-    return;
-  }
-  const body = EnhanceBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: 'Send { "prompt": "..." } with 3-2000 characters.' });
-    return;
-  }
-  const cancel = new AbortController();
-  res.on('close', () => {
-    if (!res.writableEnded) cancel.abort(new Error('cancelled by client'));
-  });
-  try {
-    const prompt = await enhanceIdea(provider, body.data.prompt, body.data.options, cancel.signal);
-    res.json({ prompt });
-  } catch (err) {
-    if (cancel.signal.aborted) return;
-    const failure = describeFailure(err, provider.label);
-    console.error('[enhance] failed:', (err as Error).message);
-    res.status(err instanceof ProviderError ? 502 : 500).json({ error: failure.message, title: failure.title });
-  }
-});
+toolRoute('/api/enhance', z.object({ prompt: z.string().trim().min(3).max(2000), options: GameOptionsSchema.optional() }), async (b, p, signal) => ({
+  prompt: await enhanceIdea(p, b.prompt, b.options, signal),
+}));
+
+/** Storyboard (story, characters, levels, objectives, obstacles, win/lose) before generating. */
+toolRoute('/api/storyboard', z.object({ prompt: z.string().trim().min(3).max(2000), options: GameOptionsSchema.optional() }), (b, p, signal) =>
+  makeStoryboard(p, b.prompt, b.options, signal),
+);
+
+/** Character from a description of appearance, personality, abilities and movement. */
+toolRoute('/api/character', z.object({ description: z.string().trim().min(3).max(1200), background: Hex }), (b, p, signal) =>
+  makeCharacter(p, b.description, b.background, signal),
+);
+
+/** Diagnose a reported problem against the game's spec and propose a fixed spec. */
+toolRoute('/api/debug', z.object({ spec: GameSpecSchema, problem: z.string().trim().min(3).max(1200) }), (b, p, signal) =>
+  debugGame(p, b.spec, b.problem, signal),
+);
+
+/** Redraw one sprite (Asset Studio). */
+toolRoute('/api/sprite', z.object({ sprite: SpriteSchema, change: z.string().trim().min(3).max(600), background: Hex }), async (b, p, signal) => ({
+  sprite: await redrawSprite(p, b.sprite, b.change, b.background, signal),
+}));
 
 app.post('/api/generate', async (req, res) => {
   if (!provider) {
@@ -121,6 +153,9 @@ function describeFailure(err: unknown, model: string): { title: string; message:
   }
   if (err instanceof GenerationError) {
     return { title: 'The model could not produce a valid game', message: err.message };
+  }
+  if (err instanceof AskError) {
+    return { title: 'The model could not produce a valid answer', message: err.message };
   }
   return { title: 'Generation failed', message: (err as Error).message };
 }

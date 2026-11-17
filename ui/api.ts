@@ -1,6 +1,8 @@
 import type { GenerateEvent, GenerateProgress } from '../generator/generate';
 import { GameSpecSchema, type GameSpec } from '../spec/schema';
 import type { GameOptions } from '../spec/gameOptions';
+import { z } from 'zod';
+import { CharacterSchema, DebugResultSchema, SpriteResultSchema, StoryboardSchema, type Character, type DebugResult, type Storyboard } from '../spec/tools';
 
 export interface Health {
   ok: boolean;
@@ -87,21 +89,35 @@ export async function generateGame(
   throw new Error('The server closed the connection before the game was ready.');
 }
 
-/** Ask the model to turn a short idea into a richer description. */
-export async function enhancePrompt(prompt: string, options?: GameOptions, signal?: AbortSignal): Promise<string> {
+/** POST to one of the AI tool endpoints and validate the answer again on arrival. */
+async function postTool<T>(path: string, body: unknown, schema: { parse(data: unknown): T }, failTitle: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch('/api/enhance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, options }),
-      signal,
-    });
+    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
   } catch (err) {
     if (signal?.aborted) throw err;
     throw new Error('Could not reach the local server. Is "npm run dev" running?');
   }
-  const data = (await res.json().catch(() => ({}))) as { prompt?: string; error?: string; title?: string };
-  if (!res.ok || typeof data.prompt !== 'string') throw new GenerateFailure(data.title ?? 'Could not enhance the prompt', data.error ?? `Server error ${res.status}`);
-  return data.prompt;
+  const data = (await res.json().catch(() => ({}))) as { error?: string; title?: string };
+  if (!res.ok) throw new GenerateFailure(data.title ?? failTitle, data.error ?? `Server error ${res.status}`);
+  return schema.parse(data);
 }
+
+const PromptReply = z.object({ prompt: z.string() });
+
+/** Ask the model to turn a short idea into a richer description. */
+export async function enhancePrompt(prompt: string, options?: GameOptions, signal?: AbortSignal): Promise<string> {
+  return (await postTool('/api/enhance', { prompt, options }, PromptReply, 'Could not enhance the prompt', signal)).prompt;
+}
+
+export const fetchStoryboard = (prompt: string, options: GameOptions | undefined, signal?: AbortSignal): Promise<Storyboard> =>
+  postTool('/api/storyboard', { prompt, options }, StoryboardSchema, 'Could not create a storyboard', signal);
+
+export const fetchCharacter = (description: string, background: string, signal?: AbortSignal): Promise<Character> =>
+  postTool('/api/character', { description, background }, CharacterSchema, 'Could not create the character', signal);
+
+export const fetchDebug = (spec: GameSpec, problem: string, signal?: AbortSignal): Promise<DebugResult> =>
+  postTool('/api/debug', { spec, problem }, DebugResultSchema, 'Could not debug the game', signal);
+
+export const fetchSprite = (sprite: GameSpec['sprites'][string], change: string, background: string, signal?: AbortSignal) =>
+  postTool('/api/sprite', { sprite, change, background }, SpriteResultSchema, 'Could not redraw the sprite', signal).then((r) => r.sprite);

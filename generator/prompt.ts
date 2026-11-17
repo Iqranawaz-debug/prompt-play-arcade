@@ -4,24 +4,10 @@ import { optionsBrief, type GameOptions } from '../spec/gameOptions';
 import { cometCourier } from '../spec/examples/cometCourier';
 import { philosopherFishing } from '../spec/examples/philosopherFishing';
 
-const jsonSchema = JSON.stringify(z.toJSONSchema(GameSpecSchema, { io: 'input', unrepresentable: 'any' }));
+export const jsonSchema = JSON.stringify(z.toJSONSchema(GameSpecSchema, { io: 'input', unrepresentable: 'any' }));
 
-export const SYSTEM_PROMPT = `You design small, fun 2D arcade games for a fixed game engine.
-You never write code. You reply with ONE JSON object that matches the JSON Schema below, and nothing else.
-
-How the engine works:
-- The screen is 800x600 pixels. The player sprite moves with arrow keys/WASD or by dragging.
-- Entities spawn from screen edges on timers (spawns[]) and move by "behavior".
-- When the player touches an entity, onCollide applies: score change, lives change, optional destroy, and one of its quotes pops up.
-- The game is lost when lives reach 0 (or the optional time limit runs out). It is won by reaching a score target or surviving N seconds.
-
-Rules:
-- "version" is always 1. Ids are lowercase snake_case. Colours are "#rrggbb".
-- Every sprite referenced by player/entities must exist in "sprites"; every spawn.entity must exist in "entities".
-- Give entities personality through names and short quotes that fit the user's idea.
-- Set "faces" to "left" or "right" for sprites drawn facing a direction (fish, cars), otherwise "none".
-
-Sprites (inline SVG, shown at only 24-64 px, so they must read instantly):
+/** How to draw sprites; shared by game generation, the character creator and the asset studio. */
+export const SPRITE_RULES = `Sprites (inline SVG, shown at only 24-64 px, so they must read instantly):
 - Include xmlns="http://www.w3.org/2000/svg" and a viewBox with the same aspect ratio as width/height.
   Keep every shape inside the viewBox. No <text>, <script>, event handlers, images or external hrefs. Under 2000 characters.
 - Before drawing, decide the ONE feature that makes the thing recognisable (a hedgehog's spikes, a beetle's legs and
@@ -41,7 +27,24 @@ Sprites (inline SVG, shown at only 24-64 px, so they must read instantly):
   the signature parts.
 - Make the player the most distinctive sprite (40-64 px).
   Rewards should look appealing (bright, warm), hazards should look dangerous (spikes, angry eyes, red or purple).
-- "Glowing" things: put a larger circle or ellipse behind them in a light colour with fill-opacity 0.25-0.4.
+- "Glowing" things: put a larger circle or ellipse behind them in a light colour with fill-opacity 0.25-0.4.`;
+
+export const SYSTEM_PROMPT = `You design small, fun 2D arcade games for a fixed game engine.
+You never write code. You reply with ONE JSON object that matches the JSON Schema below, and nothing else.
+
+How the engine works:
+- The screen is 800x600 pixels. The player sprite moves with arrow keys/WASD or by dragging.
+- Entities spawn from screen edges on timers (spawns[]) and move by "behavior".
+- When the player touches an entity, onCollide applies: score change, lives change, optional destroy, and one of its quotes pops up.
+- The game is lost when lives reach 0 (or the optional time limit runs out). It is won by reaching a score target or surviving N seconds.
+
+Rules:
+- "version" is always 1. Ids are lowercase snake_case. Colours are "#rrggbb".
+- Every sprite referenced by player/entities must exist in "sprites"; every spawn.entity must exist in "entities".
+- Give entities personality through names and short quotes that fit the user's idea.
+- Set "faces" to "left" or "right" for sprites drawn facing a direction (fish, cars), otherwise "none".
+
+${SPRITE_RULES}
 
 Balance (the validator enforces the first two):
 - A chasing hazard (behavior "chase" with negative lives) must have speed at most 75% of player.speed.

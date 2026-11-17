@@ -9,6 +9,8 @@ import { addGame, addVersion, currentVersionOf, deleteGame, listGames, listPlays
 import { compact, personalBest } from './stats';
 import { createStatsPanel } from './statsPanel';
 import { createHistoryPanel } from './history';
+import type { StudioContext } from './studio/context';
+import { createStoryboard } from './studio/storyboard';
 import { decodeSpec, sharedFromHash } from './share';
 import { createShareDialog } from './shareDialog';
 import { createGameOptions } from './gameOptions';
@@ -180,6 +182,7 @@ function setStageInfo(game?: { title: string; spec: GameSpec }): void {
 
 // ---------- AI prompt enhancer ----------
 const enhanceBtn = $<HTMLButtonElement>('enhance');
+const storyboardBtn = $<HTMLButtonElement>('storyboard');
 const enhanceNote = $('enhance-note');
 let beforeEnhance: string | undefined;
 let enhancing: AbortController | undefined;
@@ -231,6 +234,7 @@ function updateCounter(): void {
   promptCounter.classList.toggle('near-limit', n > promptBox.maxLength * 0.9);
   form.classList.toggle('has-prompt', promptBox.value.trim().length >= 3);
   enhanceBtn.disabled = promptBox.value.trim().length < 3 || Boolean(enhancing) || Boolean(inFlight);
+  storyboardBtn.disabled = enhanceBtn.disabled;
 }
 
 /** Latest library contents (unfiltered), also used by the command palette. */
@@ -400,6 +404,7 @@ function setBusy(busy: boolean): void {
   for (const chip of ideaChips) chip.disabled = busy;
   gameOptions.setDisabled(busy);
   enhanceBtn.disabled = busy || promptBox.value.trim().length < 3;
+  storyboardBtn.disabled = enhanceBtn.disabled;
   if (busy) enhanceNote.hidden = true;
   setButtonLabel(generateBtn, buttonLabel(busy));
 }
@@ -511,6 +516,11 @@ function commands(): Command[] {
       id: 'generate', group: 'Create', title: 'Generate from the current prompt', hint: 'Ctrl+Enter', keywords: 'make build',
       disabled: promptBox.value.trim().length < 3 || Boolean(inFlight),
       run: () => form.requestSubmit(),
+    },
+    {
+      id: 'storyboard', group: 'Create', title: 'Plan a storyboard first', keywords: 'story characters levels plan design objectives',
+      disabled: promptBox.value.trim().length < 3 || Boolean(inFlight) || Boolean(remixTarget),
+      run: () => storyboardTool.open(promptBox.value.trim()),
     },
     {
       id: 'enhance', group: 'Create', title: 'Enhance prompt with AI', keywords: 'improve expand describe better idea',
@@ -635,6 +645,28 @@ $('save-shared').addEventListener('click', async () => {
   notify('success', 'Saved to library', `"${game.title}" is now in your library.`);
   await play(game);
 });
+
+// ---------- Studio tools ----------
+const studio: StudioContext = {
+  current: () => allGames.find((g) => g.id === activeId),
+  async applyVersion(spec, note) {
+    if (!activeId) return;
+    const game = await addVersion(activeId, spec, note);
+    if (!game) return;
+    notify('success', `Version ${currentVersionOf(game)} saved`, `"${game.title}": ${note}`);
+    await play(game);
+  },
+  setPrompt(text) {
+    setRemixTarget(undefined);
+    promptBox.value = text;
+    updateCounter();
+    promptBox.focus();
+  },
+  generate: () => form.requestSubmit(),
+  gameOptions: () => gameOptions.get(),
+};
+const storyboardTool = createStoryboard($('overlays'), studio);
+storyboardBtn.addEventListener('click', () => storyboardTool.open(promptBox.value.trim()));
 
 // ---------- Stats ----------
 const statsPanel = createStatsPanel($('overlays'), () => allGames);

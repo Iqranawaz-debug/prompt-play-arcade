@@ -241,3 +241,58 @@ button.search-trigger:hover:not(:disabled) { color: var(--text-2); }
 /* "Best" chip beside the live score */
 .stat.best { color: var(--text-2); }
 .stat.best .icon { color: #fcd34d; }
+
+/* ---------- Studio menu & tool dialogs ---------- */
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute; z-index: 45; top: calc(100% + 8px); right: 0; width: 290px; padding: 6px; display: grid; gap: 2px;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02) 45%), rgb(16 22 35 / 0.96);
+  animation: pop-in 160ms var(--ease);
+}
+button.menu-item {
+  height: auto; justify-content: flex-start; align-items: flex-start; gap: var(--s-3); padding: var(--s-2) var(--s-3);
+  border: 0; border-radius: var(--r-sm); background: transparent; text-align: left; white-space: normal;
+}
+button.menu-item .icon { width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+button.menu-item:hover:not(:disabled), button.menu-item:focus-visible { background: rgb(var(--accent-rgb) / 0.1); outline: none; }
+.menu-text { display: grid; gap: 1px; }
+.menu-text strong { font-size: var(--fs-sm); }
+.menu-text span { font-size: var(--fs-xs); color: var(--text-3); font-weight: 500; }
+.stage-actions button.icon-only { width: var(--h-md); }
+
+.dialog.wide { width: min(780px, calc(100vw - 32px)); }
+.tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.tool-field { display: grid; gap: 6px; min-width: 0; }
+.tool-field > span:first-child { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+.tool-field textarea, .tool-field input[type='text'], .tool-field select {
+  width: 100%; font: inherit; font-size: var(--fs-sm); color: var(--text); padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm); background: var(--surface-sunken); border: 1px solid var(--border-strong); outline: none; resize: vertical;
+}
+.tool-field textarea:focus, .tool-field input[type='text']:focus, .tool-field select:focus { border-color: rgb(var(--accent-rgb) / 0.6); box-shadow: var(--ring); }
+.tool-actions { display: flex; justify-content: flex-end; gap: var(--s-2); flex-wrap: wrap; }
+.tool-actions button { height: var(--h-md); }
+.tool-status { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--text-2); }
+.tool-error { font-size: var(--fs-xs); color: var(--danger); white-space: pre-wrap; }
+.tool-card { padding: var(--s-3); border-radius: var(--r-md); background: var(--surface-1); border: 1px solid var(--border); display: grid; gap: var(--s-2); }
+.tool-card h4 { margin: 0; font-size: var(--fs-sm); }
+.tool-muted { font-size: var(--fs-xs); color: var(--text-3); }
+@media (max-width: 720px) { .tool-grid { grid-template-columns: 1fr; } }
+
+/* Storyboard button beside Generate */
+.generate-row { display: grid; grid-template-columns: auto 1fr; gap: var(--s-2); margin-top: var(--s-3); }
+.generate-row #generate { margin-top: 0; }
+.composer-panel .generate-row { position: sticky; bottom: 0; z-index: 2; }
+.composer-panel #generate { position: static; }
+button.storyboard-btn { padding: 0 var(--s-3); color: var(--text); border-color: rgb(var(--violet-rgb) / 0.45); background: linear-gradient(180deg, rgb(var(--violet-rgb) / 0.2), rgb(var(--violet-rgb) / 0.08)); }
+button.storyboard-btn:hover:not(:disabled) { border-color: rgb(var(--violet-rgb) / 0.7); }
+.composer.remixing .storyboard-btn { display: none; }
+.composer.remixing .generate-row { grid-template-columns: 1fr; }
+.span-2 { grid-column: 1 / -1; }
+.sb-section { display: grid; gap: var(--s-2); }
+.sb-section h3 { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.sb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s-2); }
+.sb-row-head { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s-2); align-items: center; }
+.sb-row-head input, .sb-row-head select { height: 32px; font: inherit; font-size: var(--fs-sm); color: var(--text); padding: 0 var(--s-2); border-radius: var(--r-sm); background: var(--surface-sunken); border: 1px solid var(--border-strong); min-width: 0; }
+.sb-row-head button { height: 28px; font-size: var(--fs-xs); }
+.dialog-foot { padding: 0 var(--s-5) var(--s-5); }
+.busy-state { padding: var(--s-8) 0; justify-content: center; }

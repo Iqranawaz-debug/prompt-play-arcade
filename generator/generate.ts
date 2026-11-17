@@ -78,7 +78,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 /** Call the model, waiting and trying again while it reports being overloaded. */
-async function completeWithBackoff(
+export async function completeWithBackoff(
   provider: ChatProvider,
   messages: ChatMessage[],
   attempt: number,
