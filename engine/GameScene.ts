@@ -8,6 +8,7 @@ import type { GameStatus } from './status';
 import type { SaveState } from '../spec/saveState';
 import { CONTAINED, bounceOffWalls, isFarOutside, isInside, newMover, placeSpawn, steer, type MoverState } from './motion';
 import { Animator } from './animate';
+import { RuleRunner, type RuleHost } from './rules';
 import { atLedge, buildLevel, inWall, liftOutOfWalls, type Level } from './level';
 import { registerTextures, sizeSprite, texKey } from './textures';
 import { Hud, popScore, quoteBubble, showOverlay, toast, type HudState } from './ui';
@@ -25,6 +26,8 @@ interface EntityState {
 
 
 const HIT_COOLDOWN_MS = 800;
+/** Hard cap on entities on screen, whatever rules spawn. */
+const MAX_ENTITIES = 60;
 /** Platformer forgiveness: jump this long after running off a ledge, or pressed this long before landing. */
 const COYOTE_MS = 100;
 const JUMP_BUFFER_MS = 120;
@@ -48,6 +51,9 @@ export class GameScene extends Phaser.Scene {
   private readonly music: Music;
   private invulnerableUntil = 0;
   private level?: Level;
+  private rules!: RuleRunner;
+  /** Milliseconds until each spawn rule fires next (scaled by rule spawn-rate changes). */
+  private spawnClock: number[] = [];
   /** Which level is being played, and what carries over between levels. */
   private levelIndex = 0;
   private carriedLives?: number;
@@ -122,6 +128,7 @@ export class GameScene extends Phaser.Scene {
 
     this.level = buildLevel(this, spec, levelsOf(spec)[this.levelIndex]);
     this.animator = new Animator(this);
+    this.rules = new RuleRunner(spec.rules ?? [], this.ruleHost());
 
     const def = spec.sprites[spec.player.sprite];
     let start = this.level?.start ?? { x: FIELD.x + spec.player.start.x * FIELD.w, y: FIELD.y + spec.player.start.y * FIELD.h };
@@ -178,22 +185,59 @@ export class GameScene extends Phaser.Scene {
     this.sfx.play('start');
     this.music.start(this.spec.audio.music, this.spec.audio.volume);
     this.events.once('shutdown', () => this.music.stop());
-    for (const rule of this.spec.spawns) {
-      // Fresh rounds wait startDelayMs; resumed rounds pick up the spawn rhythm where it was.
+    // Fresh rounds wait startDelayMs; resumed rounds pick up the spawn rhythm where it was.
+    this.spawnClock = this.spec.spawns.map((rule) => {
       const since = this.elapsedMs - rule.startDelayMs;
-      const first = since < 0 ? -since : rule.everyMs - (since % rule.everyMs);
-      this.time.delayedCall(first, () => {
-        this.trySpawn(rule);
-        this.time.addEvent({ delay: rule.everyMs, loop: true, callback: () => this.trySpawn(rule) });
-      });
-    }
+      return since < 0 ? -since : since === 0 ? 0 : rule.everyMs - (since % rule.everyMs);
+    });
+    if (this.elapsedMs === 0) this.rules.start();
   }
 
-  private trySpawn(rule: SpawnSpec): void {
+  /** Advance spawn clocks; rules can speed a rule's clock up or slow it down. */
+  private tickSpawns(delta: number): void {
+    this.spec.spawns.forEach((rule, i) => {
+      this.spawnClock[i] -= delta * this.rules.rateOf(rule.entity);
+      if (this.spawnClock[i] > 0) return;
+      this.spawnClock[i] += rule.everyMs;
+      this.trySpawn(rule);
+    });
+  }
+
+  /** How rule actions reach the game. Every action is ignored once the round is over. */
+  private ruleHost(): RuleHost {
+    const live = () => this.phase === 'playing';
+    return {
+      stats: () => ({ score: this.score, lives: this.lives, time: Math.floor(this.elapsedMs / 1000), level: this.levelIndex + 1 }),
+      spawn: (id, count) => {
+        if (!live()) return;
+        const rule = this.spec.spawns.find((s) => s.entity === id) ?? { entity: id, edge: 'anywhere' as const, everyMs: 1000, maxAlive: 1, startDelayMs: 0 };
+        for (let i = 0; i < count; i++) this.trySpawn(rule, true);
+      },
+      addScore: (n) => {
+        if (!live()) return;
+        this.score = Math.max(0, this.score + n);
+        popScore(this, this.player.x, this.player.y - 30, `${n > 0 ? '+' : ''}${n}`, n > 0 ? this.spec.theme.primary : this.spec.theme.accent);
+      },
+      addLives: (n) => {
+        if (live()) this.lives = Math.max(0, Math.min(9, this.lives + n));
+      },
+      clear: (id) => {
+        if (!live()) return;
+        for (const c of [...this.entities.getChildren()]) if (!id || this.state.get(c)?.spec.id === id) c.destroy();
+      },
+      message: (text) => live() && toast(this, text, this.spec.theme),
+      sound: (name) => live() && this.sfx.play(name),
+      win: () => live() && this.endRound(true),
+      lose: () => live() && this.endRound(false),
+    };
+  }
+
+  /** `forced` spawns come from rules: they skip maxAlive but still respect an overall cap. */
+  private trySpawn(rule: SpawnSpec, forced = false): void {
     const spec = this.entityById.get(rule.entity);
     if (this.phase !== 'playing' || !spec) return;
     const alive = this.entities.getChildren().filter((c) => this.state.get(c)?.spec.id === spec.id).length;
-    if (alive >= rule.maxAlive) return;
+    if ((!forced && alive >= rule.maxAlive) || this.entities.getLength() >= MAX_ENTITIES) return;
 
     const def = this.spec.sprites[spec.sprite];
     const size = { w: def.width, h: def.height };
@@ -243,6 +287,7 @@ export class GameScene extends Phaser.Scene {
         const s = this.state.get(e);
         return s ? [{ id: s.spec.id, pos: vec(e), vel: vec(e.body.velocity), entered: s.entered, mover: { ...s.mover, dir: vec(s.mover.dir) } }] : [];
       }),
+      rules: this.spec.rules?.length ? this.rules.save() : undefined,
     };
   }
 
@@ -251,6 +296,7 @@ export class GameScene extends Phaser.Scene {
     this.resume = undefined; // later restarts (play again, next level) start fresh
     this.score = save.score;
     this.elapsedMs = save.elapsedMs;
+    if (save.rules) this.rules.load(save.rules);
     this.player.setPosition(save.player.pos.x, save.player.pos.y).setVelocity(save.player.vel.x, save.player.vel.y).setFlipX(save.player.flip);
     for (const e of save.entities) {
       const spec = this.entityById.get(e.id);
@@ -281,6 +327,9 @@ export class GameScene extends Phaser.Scene {
     if (this.platformer) this.movePlatformer(delta);
     else this.movePlayer();
     for (const child of [...this.entities.getChildren()]) this.moveEntity(child as Body, delta);
+    this.tickSpawns(delta);
+    this.rules.tick(this.elapsedMs);
+    if (this.phase !== 'playing') return; // a rule ended the round
 
     if (this.spec.score.perSecond > 0) {
       this.scoreCarry += (this.spec.score.perSecond * delta) / 1000;
@@ -295,7 +344,7 @@ export class GameScene extends Phaser.Scene {
   private movePlayer(): void {
     const { player, spec } = this;
     let { x: dx, y: dy } = this.controls.axis();
-    let speed = spec.player.speed;
+    let speed = spec.player.speed * this.rules.speedOf('player');
     const pointer = this.input.activePointer;
     if (dx === 0 && dy === 0 && pointer.isDown) {
       dx = pointer.worldX - player.x;
@@ -331,7 +380,7 @@ export class GameScene extends Phaser.Scene {
 
     const friction = Math.min(0.95, physics.friction);
     const blend = friction === 0 ? 1 : 1 - friction ** (delta / 16.67);
-    const target = dx * spec.player.speed;
+    const target = dx * spec.player.speed * this.rules.speedOf('player');
     player.setVelocityX(body.velocity.x + (target - body.velocity.x) * blend);
 
     if (body.blocked.down || body.touching.down) this.groundedAt = now;
@@ -373,7 +422,7 @@ export class GameScene extends Phaser.Scene {
       s.mover.dir.x = -s.mover.dir.x;
     }
 
-    let vel = steer(s.spec.behavior, s.mover, sprite, this.player, s.spec.speed, delta);
+    let vel = steer(s.spec.behavior, s.mover, sprite, this.player, s.spec.speed * this.rules.speedOf(s.spec.id), delta);
     if (s.entered && !s.mover.leaving && CONTAINED.has(s.spec.behavior)) {
       vel = bounceOffWalls(s.mover, vel, sprite, half, FIELD);
     }
@@ -418,6 +467,7 @@ export class GameScene extends Phaser.Scene {
       quoteBubble(this, sprite.x, sprite.y - 46, Phaser.Utils.Array.GetRandom(s.spec.quotes), theme);
     }
     if (destroy) sprite.destroy();
+    this.rules.touched(s.spec.id);
     this.refreshHud();
     this.checkEnd();
   }

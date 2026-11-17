@@ -7,6 +7,8 @@ import { z } from 'zod';
 const Num = z.number().finite();
 const Vec = z.object({ x: Num, y: Num });
 
+const NumRecord = z.record(z.string().max(40), Num);
+
 export const SaveStateSchema = z.object({
   v: z.literal(1),
   levelIndex: z.number().int().min(0).max(7),
@@ -27,6 +29,10 @@ export const SaveStateSchema = z.object({
       }),
     )
     .max(200),
+  /** Rule progress (which one-off rules fired, speed and spawn-rate changes), when the game has rules. */
+  rules: z
+    .object({ fired: z.array(z.number().int().min(0).max(19)).max(20), nextEvery: NumRecord, touches: NumRecord, speed: NumRecord, rate: NumRecord })
+    .optional(),
 });
 export type SaveState = z.infer<typeof SaveStateSchema>;
 
