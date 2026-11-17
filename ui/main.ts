@@ -707,4 +707,7 @@ async function init(): Promise<void> {
   modelChip.classList.toggle('offline', !health);
 }
 
-init().catch((err) => showGenError('Could not start', (err as Error).message));
+init()
+  .catch((err) => showGenError('Could not start', (err as Error).message))
+  // Marks startup as finished (library loaded, server checked); handy for automated checks.
+  .finally(() => (document.documentElement.dataset.ready = 'true'));
